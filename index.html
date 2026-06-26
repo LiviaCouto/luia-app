@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luia — Luísa Couto Mota</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%230F172A'/><path d='M8 32 C8 32 4 28 4 22 C4 12 12 6 20 6' stroke='%236366F1' stroke-width='3' stroke-linecap='round' fill='none'/><path d='M14 8 L14 26 C14 28.5 16 30.5 18.5 31 L28 31' stroke='%238B5CF6' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><path d='M28 11 L29.2 14.8 L33 16 L29.2 17.2 L28 21 L26.8 17.2 L23 16 L26.8 14.8 Z' fill='%23F59E0B'/></svg>">
+<link rel="alternate icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%237C3AED'/><text x='50%25' y='55%25' text-anchor='middle' dominant-baseline='middle' font-size='18' fill='white'>✦</text></svg>">
+<meta property="og:title" content="Luísa Couto Mota · IFPE 2027">
+<meta property="og:description" content="Preparatório Técnico Integrado · Ciclo de Estudos personalizado para o IFPE 2027">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://liviacouto.github.io/luisa-ifpe">
+<meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'><rect width='1200' height='630' fill='%2307041A'/><circle cx='200' cy='100' r='300' fill='rgba(124,58,237,0.15)'/><circle cx='1000' cy='530' r='250' fill='rgba(59,7,100,0.15)'/><text x='600' y='260' text-anchor='middle' font-family='serif' font-size='80' fill='%23C084FC'>✦</text><text x='600' y='360' text-anchor='middle' font-family='serif' font-size='52' fill='%23F0E8FF'>Luísa Couto Mota</text><text x='600' y='420' text-anchor='middle' font-family='sans-serif' font-size='24' fill='%239B8EC4'>Preparatório IFPE 2027</text></svg>">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Luísa Couto Mota · IFPE 2027">
+<meta name="twitter:description" content="Preparatório Técnico Integrado · Ciclo de Estudos personalizado">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Poppins:wght@400;500;600;700&family=Nunito:wght@700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="space-bg">
+  <div class="nebula nebula-1"></div>
+  <div class="nebula nebula-2"></div>
+  <canvas id="starCanvas"></canvas>
+</div>
+
+<!-- Overlay sidebar mobile -->
+<div id="sidebar-overlay" onclick="fecharSidebar()"></div>
+
+<!-- SIDEBAR -->
+<div id="bv-overlay" style="display:none">
+  <div id="bv-modal">
+    <div class="bv-stars" id="bv-stars"></div>
+    <div style="position:relative;z-index:1;margin-bottom:4px">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="6" y="50" font-family="Nunito,sans-serif" font-size="52" font-weight="800" fill="white">L</text>
+        <path d="M44 14 L46 10 L48 14 L52 16 L48 18 L46 22 L44 18 L40 16 Z" fill="#F59E0B"/>
+        <ellipse cx="46" cy="38" rx="12" ry="5" fill="none" stroke="#A78BFA" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="46" cy="33" r="4" fill="#7C3AED" opacity="0.9"/>
+      </svg>
+    </div>
+    <div class="bv-title" id="bv-title">Bem-vinda ao Luia! ✨</div>
+    <div class="bv-sub" id="bv-sub">Sua plataforma de estudos para o IFPE 2027.<br>Digite sua palavra-chave para entrar.</div>
+    <div style="position:relative">
+      <input class="bv-input" id="bv-input" type="password" placeholder="Digite sua palavra-chave..." autocomplete="off" onkeydown="if(event.key==='Enter')bvEntrar()" style="padding-right:44px">
+      <button onclick="const i=document.getElementById('bv-input');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:rgba(255,255,255,.5);padding:4px">👁</button>
+    </div>
+    <div class="bv-error" id="bv-error">Palavra-chave incorreta. Tente novamente.</div>
+    <button class="bv-btn" onclick="bvEntrar()">✦ Entrar</button>
+    <button class="bv-btn-visit" onclick="bvVisitante()">Ainda não tenho palavra-chave e quero conhecer o Luia!</button>
+  </div>
+</div>
+<aside class="luia-sidebar" id="luia-sidebar">
+  <div class="luia-sidebar-brand">
+    <svg class="luia-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Arco de lua (curva inferior) -->
+      <path d="M8 32 C8 32 4 28 4 22 C4 12 12 6 20 6" stroke="url(#lunaGrad)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+      <!-- L cursivo principal -->
+      <path d="M14 8 L14 26 C14 28.5 16 30.5 18.5 31 L28 31" stroke="url(#lGrad)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <!-- Estrela de 4 pontas dourada -->
+      <path d="M28 11 L29.2 14.8 L33 16 L29.2 17.2 L28 21 L26.8 17.2 L23 16 L26.8 14.8 Z" fill="#F59E0B"/>
+      <defs>
+        <linearGradient id="lGrad" x1="14" y1="8" x2="28" y2="31" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#818CF8"/>
+          <stop offset="100%" stop-color="#7C3AED"/>
+        </linearGradient>
+        <linearGradient id="lunaGrad" x1="4" y1="6" x2="20" y2="32" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#6366F1" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#4F46E5" stop-opacity="0.3"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <div class="luia-logo-name">Luia</div>
+  </div>
+  <!-- user removido da sidebar — aparece no hero -->
+  <nav class="luia-nav">
+    <div class="luia-nav-section">Principal</div>
+    <button class="luia-nav-item active" onclick="showLuia('dashboard',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Início
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('plano',this)">
+      <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Meu Plano
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('cronograma',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Cronograma
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('lancar',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Cronômetro
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('historico',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Histórico
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('revisoes',this)">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Revisões
+      <span id="rev-badge" style="display:none;margin-left:auto;background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;min-width:18px;text-align:center">0</span>
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('simulados',this)">
+      <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Questões
+      <span id="sim-badge" style="display:none;margin-left:auto;background:#A78BFA;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px">★</span>
+    </button>
+    <div class="luia-nav-section">Análise</div>
+    <button class="luia-nav-item" onclick="showLuia('progresso',this)">
+      <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Progresso
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('sobre',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Sobre mim
+    </button>
+    <div class="luia-nav-section">Configurações</div>
+    <button class="luia-nav-item" onclick="showLuia('perfil',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Perfil
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('metas',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Metas
+    </button>
+    <button class="luia-nav-item" onclick="showLuia('feedback',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Feedback
+    </button>
+  </nav>
+  <div class="luia-sidebar-footer">
+    <div class="luia-theme-row">
+      <button class="theme-btn active" onclick="setTheme('dark',this)">🌙</button>
+      <button class="theme-btn" onclick="setTheme('light',this)">☀️</button>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="luia-main">
+  <header class="luia-topbar">
+    <button class="luia-menu-btn" onclick="abrirSidebar()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div style="position:relative">
+      <button class="luia-plan-btn" onclick="togglePlanDropdown(this)" id="plan-btn">
+        <div class="luia-plan-dot"></div>
+        <span id="plan-label">IFPE 2027</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="plano-dropdown" id="plan-dropdown" style="display:none">
+        <div class="plano-dropdown-item ativo">
+          <div class="plano-dropdown-dot" style="background:#8B5CF6"></div>
+          IFPE 2027
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2.5" style="margin-left:auto"><path d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <div class="plano-dropdown-item em-breve">
+          <div class="plano-dropdown-dot" style="background:#F59E0B"></div>
+          ENEM 2027
+          <span class="plano-dropdown-badge">Em breve</span>
+        </div>
+        <div class="plano-dropdown-item em-breve">
+          <div class="plano-dropdown-dot" style="background:#10B981"></div>
+          SSA 1
+          <span class="plano-dropdown-badge">Em breve</span>
+        </div>
+      </div>
+    </div>
+    <div class="luia-topbar-spacer"></div>
+    <div class="luia-sync">
+      <div class="sync-dot loading" id="sync-dot"></div>
+      <span id="sync-msg">Conectando...</span>
+    </div>
+  </header>
+
+  <div class="luia-content">
+
+  <!-- DASHBOARD -->
+  <div id="sec-dashboard" class="section active">
+    <div class="luia-hero">
+      <div class="luia-hero-left">
+        <div class="luia-hero-greeting">Bem-vinda, Luísa! 👋</div>
+        <div class="luia-hero-sub" id="welcome-sub">Carregando seu progresso...</div>
+        <div class="countdown-wrap" id="countdown-wrap">
+          <div class="countdown-circle">
+            <svg width="64" height="64" viewBox="0 0 64 64">
+              <circle class="countdown-circle-bg" cx="32" cy="32" r="28"/>
+              <circle class="countdown-circle-fill" id="countdown-arc" cx="32" cy="32" r="28" stroke-dasharray="175.9" stroke-dashoffset="175.9"/>
+            </svg>
+            <div class="countdown-dias">
+              <span class="countdown-num" id="countdown-num">—</span>
+              <span class="countdown-sublabel">dias</span>
+            </div>
+          </div>
+          <div class="countdown-info">
+            <div class="countdown-objetivo" id="countdown-objetivo">IFPE 2027</div>
+            <div class="countdown-texto" id="countdown-texto">Calculando...</div>
+            <div class="countdown-pct" id="countdown-pct"></div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-avatar-wrap">
+        <div class="hero-star"></div>
+        <div class="hero-star"></div>
+        <div class="hero-star"></div>
+        <div class="hero-star"></div>
+        <div class="luia-hero-avatar" id="hero-avatar" onclick="showLuia('perfil',null)">L</div>
+      </div>
+    </div>
+
+    <!-- BANNER PALAVRA-CHAVE -->
+
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value" id="st-sess">0</div><div class="stat-label">Registros</div></div>
+      <div class="stat-card"><div class="stat-value" id="st-q">0</div><div class="stat-label">Questões</div></div>
+      <div class="stat-card"><div class="stat-value" id="st-pct">—</div><div class="stat-label">% Acertos</div></div>
+      <div class="stat-card"><div class="stat-value" id="st-min">0</div><div class="stat-label">Horas estudadas</div></div>
+      <div style="display:none" id="st-sem-hidden"></div>
+    </div>
+
+    <!-- STREAK -->
+    <div class="streak-card" id="streak-card">
+      <div class="streak-top">
+        <div class="streak-main">
+          <div style="display:flex;align-items:flex-end;gap:8px">
+            <div class="streak-fire">🔥</div>
+            <div class="streak-num" id="streak-num">0</div>
+          </div>
+          <div class="streak-label">dias seguidos estudando</div>
+        </div>
+        <div class="streak-record">
+          <span>Recorde</span>
+          <strong id="streak-record">0 dias</strong>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;margin-top:12px">
+        <button onclick="streakPrevMonth()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px">‹</button>
+        <span id="streak-month-label" style="font-size:11px;color:var(--text-secondary);letter-spacing:1px"></span>
+        <button id="streak-next-btn" onclick="streakNextMonth()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:0 4px;visibility:hidden">›</button>
+      </div>
+      <div class="streak-calendar" id="streak-calendar"></div>
+      <div id="streak-alerta" style="display:none;margin-top:8px;font-size:11px;color:var(--warning);background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:7px 12px;text-align:center"></div>
+    </div>
+
+    <!-- METAS NO DASH -->
+    <div id="dash-metas-wrap" style="display:none">
+      <div class="card-title" style="margin-bottom:.75rem;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--accent)">✦ Metas desta semana</div>
+      <div class="dash-metas" id="dash-metas"></div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="card">
+      <div class="card-title">✦ Análise rápida</div>
+      <div class="analytics-grid" id="analytics-grid">
+        <div class="analytics-card"><div class="analytics-label">Melhor matéria</div><div class="analytics-value" id="an-best">—</div><div class="analytics-sub" id="an-best-sub"></div></div>
+        <div class="analytics-card"><div class="analytics-label">Matéria crítica</div><div class="analytics-value" id="an-worst">—</div><div class="analytics-sub" id="an-worst-sub"></div></div>
+        <div class="analytics-card"><div class="analytics-label">Média por estudo</div><div class="analytics-value" id="an-avg">—</div><div class="analytics-sub"></div></div>
+        <div class="analytics-card"><div class="analytics-label">Dia mais produtivo</div><div class="analytics-value" id="an-day">—</div><div class="analytics-sub" id="an-day-sub"></div></div>
+      </div>
+    </div>
+
+    <!-- CARD SIMULADOS -->
+    <div class="card" id="sim-dash-card" style="display:none">
+      <div class="card-title" style="cursor:pointer" onclick="showLuia('simulados',null)">🎯 Simulados <span style="font-size:10px;color:var(--text-dim);font-weight:400;margin-left:4px">→ Ver todos</span></div>
+      <div id="sim-dash-wrap"></div>
+    </div>
+
+    <!-- RECADOS -->
+    <div class="card" id="card-recados">
+      <div class="card-title">✦ Recados</div>
+      <div id="recado-content"><p style="color:var(--text-dim);font-size:13px;font-style:italic">Deixe um recado no campo observação ao lançar uma sessão!</p></div>
+    </div>
+
+    <!-- REVISÕES PENDENTES -->
+    <div class="card" id="rev-dash-card" style="display:none">
+      <div class="card-title">⏰ Revisões pendentes hoje</div>
+      <div id="rev-dash-list"></div>
+    </div>
+
+    <div class="card"><div class="card-title">✦ Progresso por matéria</div><div id="progress-list"></div></div>
+
+    <div class="card"><div class="card-title">✦ Tipos de estudo</div><div id="tags-dash"><p style="color:var(--text-dim);font-size:12px">Nenhuma tag registrada ainda.</p></div></div>
+
+    <div class="card">
+      <div class="card-title">✦ Conquistas</div>
+      <div id="conquistas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:.25rem"></div>
+    </div>
+
+
+    <div class="card">
+      <div class="card-title">✦ Tempo estudado por matéria</div>
+      <div id="chart-tempo-wrap">
+        <div class="chart-empty" id="empty-tempo"><div class="empty-icon">⏱</div><div class="empty-msg">Use o cronômetro e os dados aparecem aqui!</div></div>
+        <div id="chart-tempo-inner" style="display:none">
+          <div class="donut-row">
+            <div style="position:relative;width:150px;height:150px;flex-shrink:0">
+              <canvas id="chartTempo" role="img"></canvas>
+              <div id="donut-center" class="donut-center"></div>
+            </div>
+            <div id="tempo-legend" class="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✦ Acertos × Erros por matéria</div>
+      <div class="chart-empty" id="empty-mat"><div class="empty-icon">🎯</div><div class="empty-msg">Registre questões em uma sessão e veja seus acertos aqui!</div></div>
+      <div id="chart-mat-inner" style="display:none"><div id="mat-bars"></div></div>
+    </div>
+  </div>
+
+  <!-- CRONOGRAMA -->
+  <div id="sec-cronograma" class="section">
+    <div class="card" style="margin-bottom:1.2rem">
+      <div class="card-title">✦ Cronograma semanal</div>
+      <p style="font-size:12px;color:var(--text-secondary);line-height:1.7">Baseado na sua rotina real no Colégio DOM de Olinda. Dias integrais, Pré-SSA e reforço respeitados.</p>
+    </div>
+    <div id="dias-list"></div>
+  </div>
+
+  <!-- LANÇAR -->
+  <div id="sec-lancar" class="section">
+    <div class="timer-box">
+      <div class="timer-label">CRONÔMETRO DA SESSÃO</div>
+      <div class="timer-display" id="timer-display">00:00:00</div>
+      <div class="timer-btns">
+        <button class="timer-btn" id="btn-start" onclick="_authTimerStart()">▶ Iniciar</button>
+        <button class="timer-btn stop-btn" id="btn-stop" onclick="timerStop()" style="display:none">■ Parar</button>
+        <button class="timer-btn" id="btn-reset" onclick="timerReset()">↺ Zerar</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">✦ Nova sessão de estudo</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Matéria</label>
+          <select class="form-control" id="f-materia" onchange="updateTopicos()">
+            <option value="">Selecione...</option>
+            <option>Português</option><option>Matemática</option>
+            <option>Ciências da Natureza</option><option>História</option><option>Geografia</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data</label>
+          <input type="date" class="form-control" id="f-data">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tópico</label>
+          <select class="form-control" id="f-topico" onchange="updateSubtopicos()" disabled>
+            <option value="">Selecione a matéria primeiro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subtópico</label>
+          <select class="form-control" id="f-subtopico" onchange="checkOutro()" disabled>
+            <option value="">Selecione o tópico primeiro</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="outro-group" style="display:none;margin-bottom:10px">
+        <label class="form-label">Descreva o assunto</label>
+        <input type="text" class="form-control" id="f-outro" placeholder="Outro assunto...">
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label" style="display:flex;align-items:center;gap:6px">
+          Tempo estudado
+          <span id="timer-badge" style="display:none;font-size:9px;background:rgba(168,85,247,.25);color:var(--accent-light);padding:1px 6px;border-radius:99px">✦ CRONÔMETRO</span>
+        </label>
+        <div class="tempo-hm">
+          <input type="number" class="form-control" id="f-horas" placeholder="0" min="0" max="23" style="width:70px">
+          <span>h</span>
+          <input type="number" class="form-control" id="f-mins" placeholder="00" min="0" max="59" style="width:70px">
+          <span>min</span>
+          <button type="button" onclick="usarCronometro()" class="btn-secondary" style="font-size:10px;padding:7px 10px">⏱ Usar</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Questões certas</label>
+          <input type="number" class="form-control" id="f-acertos" placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Questões erradas</label>
+          <input type="number" class="form-control" id="f-erros" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Tipo de estudo <span style="color:var(--danger)">*</span></label>
+        <div class="tags-fixas" id="tags-fixas">
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'teoria')">📖 Teoria</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'questões')">❓ Questões</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'revisão')">🔁 Revisão</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'simulado')">📝 Simulado</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'leitura')">📚 Leitura</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'resumo')">✍️ Resumo</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'prova')">🎯 Prova</button>
+          <button type="button" class="tag-fixa" onclick="toggleTagFixa(this,'reforço')">💪 Reforço</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Observação (opcional)</label>
+        <input type="text" class="form-control" id="f-obs" placeholder="Como foi a sessão?">
+      </div>
+      <button class="btn-primary" onclick="_authLancar()">✦ Registrar sessão</button>
+    </div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div id="sec-historico" class="section">
+    <div class="search-bar">
+      <input type="text" class="form-control" id="search-input" placeholder="🔍  Buscar por matéria, assunto, banca, tag..." oninput="renderHistorico()">
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="setFilter('ativas',this)">Ativas</button>
+      <button class="filter-tab" onclick="setFilter('arquivadas',this)">Arquivadas</button>
+      <button class="filter-tab" onclick="setFilter('todas',this)">Todas</button>
+    </div>
+    <div id="historico-list"><p style="color:var(--text-dim);font-size:13px">Nenhuma sessão ainda.</p></div>
+  </div>
+
+  <!-- REVISÕES -->
+  <div id="sec-revisoes" class="section">
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">✦ Revisão espaçada</div>
+      <p style="font-size:12px;color:var(--text-secondary);line-height:1.7">Cada sessão gera revisões automáticas em 24h, 7, 15 e 30 dias. Revise no dia certo para fixar de verdade.</p>
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="setRevFilter('hoje',this)">📌 Hoje</button>
+      <button class="filter-tab" onclick="setRevFilter('proximas',this)">📅 Próximas</button>
+      <button class="filter-tab" onclick="setRevFilter('concluida',this)">✓ Concluídas</button>
+    </div>
+    <div id="revisoes-list"></div>
+  </div>
+
+  <!-- PLANO PANORÂMICO -->
+  <div id="sec-plano" class="section">
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-title">✦ Plano de estudos · até 20/12</div>
+      <p style="font-size:12px;color:var(--text-secondary);line-height:1.7">Visão panorâmica semana a semana baseada no edital do IFPE. Marque cada dia ao concluir.</p>
+    </div>
+    <div id="plano-list"></div>
+  </div>
+
+  <!-- SIMULADOS -->
+  <div id="sec-simulados" class="section">
+
+    <!-- TELA 1: CONFIGURAR -->
+    <div id="sim-tela-config">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">🎯 Novo simulado</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;line-height:1.7">A IA vai gerar questões no estilo IFPE baseadas no edital. Escolha a matéria, o assunto e o nível.</p>
+
+        <div class="sim-config-grid">
+          <div class="form-group">
+            <label class="form-label">Matéria</label>
+            <select class="form-control" id="sim-materia" onchange="atualizarTopicosSimulado()" style="background:#1E293B;color:#F1F5F9">
+              <option value="">Selecione...</option>
+              <option>Português</option>
+              <option>Matemática</option>
+              <option>Ciências da Natureza</option>
+              <option>História</option>
+              <option>Geografia</option>
+              <option>Misto (todas)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tópico</label>
+            <select class="form-control" id="sim-topico" style="background:#1E293B;color:#F1F5F9">
+              <option value="">Selecione a matéria primeiro</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-label" style="margin-bottom:8px">Nível de dificuldade</div>
+        <div class="sim-nivel-grid" style="margin-bottom:16px">
+          <button class="sim-nivel-btn on" onclick="selecionarNivel(this,'fácil')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg> Fácil</button>
+          <button class="sim-nivel-btn" onclick="selecionarNivel(this,'médio')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="15" x2="16" y2="15"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg> Médio</button>
+          <button class="sim-nivel-btn" onclick="selecionarNivel(this,'difícil')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Difícil</button>
+          <button class="sim-nivel-btn" onclick="selecionarNivel(this,'misto')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg> Misto</button>
+        </div>
+
+        <div class="form-label" style="margin-bottom:8px">Quantidade de questões</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+          <button class="sim-qtd-btn on" onclick="selecionarQtd(this,5)">5</button>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
+          <input type="checkbox" id="sim-cronometro" checked style="width:16px;height:16px;accent-color:var(--accent)">
+          <label for="sim-cronometro" style="font-size:13px;color:var(--text-secondary);cursor:pointer">Usar cronômetro</label>
+        </div>
+
+        <button class="btn-primary" onclick="_authIniciarSimulado()">✦ Gerar questões com IA</button>
+      </div>
+
+      <!-- Histórico de simulados -->
+      <div class="card">
+        <div class="card-title">📊 Histórico de simulados</div>
+        <div id="sim-historico-list"><p style="color:var(--text-dim);font-size:13px">Nenhum simulado ainda.</p></div>
+      </div>
+
+      <!-- Favoritas -->
+      <div class="card" style="margin-top:12px" id="sim-favoritas-section" style="display:none">
+        <div class="card-title">⭐ Questões favoritas</div>
+        <div id="sim-favoritas-list"></div>
+      </div>
+    </div>
+
+    <!-- TELA 2: SIMULANDO -->
+    <div id="sim-tela-prova" style="display:none">
+      <div class="sim-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="sim-num" id="sim-q-num">1/5</span>
+          <div class="sim-mapa" id="sim-mapa"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="sim-timer" id="sim-timer">00:00</span>
+          <button class="sim-act-btn" onclick="pausarSimulado()" id="sim-pause-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> Pausar</button>
+          <button class="sim-act-btn" onclick="encerrarSimulado()" style="color:var(--danger);border-color:var(--danger)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Encerrar</button>
+        </div>
+      </div>
+
+      <div id="sim-questao-wrap"></div>
+
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:12px">
+        <button class="sim-act-btn" onclick="irQuestao(simAtual-1)" id="sim-btn-ant">← Anterior</button>
+        <div style="display:flex;gap:8px">
+          <button class="sim-act-btn" onclick="toggleFavorita()" id="sim-btn-fav"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Favoritar</button>
+          <button class="sim-act-btn" onclick="abrirComentario()" id="sim-btn-com"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Anotação</button>
+        </div>
+        <button class="btn-primary" id="sim-btn-confirmar" onclick="confirmarResposta()" style="padding:8px 20px;font-size:13px;display:flex;align-items:center;gap:6px;opacity:0.5;cursor:not-allowed" disabled>Confirmar ✓</button>
+        <button class="btn-primary" onclick="proximaQuestao()" id="sim-btn-prox" style="padding:8px 20px;font-size:13px;display:none">Próxima →</button>
+      </div>
+
+      <!-- Modal comentário -->
+      <div id="sim-modal-com" style="display:none;margin-top:12px">
+        <textarea id="sim-comentario-txt" class="form-control" rows="3" placeholder="Anote algo sobre esta questão..."></textarea>
+        <button class="sim-act-btn" onclick="salvarComentario()" style="margin-top:6px">Salvar</button>
+      </div>
+    </div>
+
+    <!-- TELA 3: RESULTADO -->
+    <div id="sim-tela-resultado" style="display:none">
+      <div style="margin-bottom:10px">
+        <button class="sim-act-btn" onclick="voltarParaSimulados()" style="display:flex;align-items:center;gap:6px;padding:8px 14px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg> Voltar ao histórico</button>
+      </div>
+      <div class="sim-resultado-hero">
+        <div class="sim-resultado-pct" id="sim-res-pct">—</div>
+        <div style="font-size:14px;color:rgba(255,255,255,.8);margin-bottom:4px" id="sim-res-label">de acertos</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.5)" id="sim-res-sub"></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">📋 Revisão das questões</div>
+        <div id="sim-revisao-wrap"></div>
+      </div>
+      <div class="card" id="sim-favoritas-res" style="margin-bottom:12px;display:none">
+        <div class="card-title">⭐ Questões favoritadas</div>
+        <div id="sim-favoritas-res-list"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap" id="sim-res-botoes">
+        <button class="btn-primary" onclick="voltarParaSimulados()" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg> ✦ Voltar / Novo simulado</button>
+        <button class="sim-act-btn" id="sim-btn-repetir" onclick="_authRepetirSimulado()" style="flex:1;padding:11px;display:flex;align-items:center;justify-content:center;gap:6px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg> Repetir erros</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOBRE MIM -->
+  <div id="sec-sobre" class="section">
+    <!-- Conteúdo bloqueado (aparece quando não tem auth) -->
+    <div id="sobre-locked-wrap" style="display:none">
+      <div class="sobre-locked">
+        <span class="sobre-locked-icon">🔒</span>
+        <div class="sobre-locked-title">Conteúdo pessoal</div>
+        <div class="sobre-locked-sub">Esta seção tem informações suas.<br>Confirme sua identidade para continuar.</div>
+        <button class="sobre-locked-btn" onclick="comAuth(()=>{document.getElementById('sobre-locked-wrap').style.display='none';document.getElementById('sobre-mim-card').style.display='block';renderSobreMim();})">🔓 Confirmar identidade</button>
+      </div>
+    </div>
+    <!-- Conteúdo real -->
+    <div class="sobre-mim-card" id="sobre-mim-card" style="display:none">
+      <div class="sobre-mim-foto" id="sobre-foto">L</div>
+      <div class="sobre-mim-nome" id="sobre-nome">Luísa</div>
+      <div class="sobre-mim-signo" id="sobre-signo">✦ IFPE 2027</div>
+      <div class="sobre-mim-grid" id="sobre-grid">
+        <div class="sobre-mim-item sobre-mim-full" style="text-align:center;color:#64748B;font-size:13px">
+          Preencha seu perfil para ver seus dados aqui ✨
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESSO -->
+  <div id="sec-progresso" class="section">
+    <!-- Seletor de período + botão exportar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="filter-tabs" style="margin-bottom:0">
+        <button class="filter-tab active" onclick="setProgPeriodo(7,this)">7 dias</button>
+        <button class="filter-tab" onclick="setProgPeriodo(15,this)">15 dias</button>
+        <button class="filter-tab" onclick="setProgPeriodo(30,this)">30 dias</button>
+        <button class="filter-tab" onclick="setProgPeriodo(0,this)">Total</button>
+      </div>
+      <button onclick="abrirModalRelatorio()" style="display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,#7C3AED,#6D28D9);border:none;border-radius:10px;padding:9px 16px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;white-space:nowrap" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>
+        Gerar relatório
+      </button>
+    </div>
+
+    <!-- 1. Alerta da semana -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">⚡ Alerta da semana</div>
+      <div id="prog-alerta" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <!-- 2. Projeção até a prova -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">🎯 Projeção até a prova</div>
+      <div id="prog-projecao"></div>
+    </div>
+
+    <!-- 3. Desempenho por matéria -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">✦ Desempenho por matéria</div>
+      <div id="prog-materias-wrap"><p style="color:var(--text-dim);font-size:13px">Nenhuma sessão no período.</p></div>
+    </div>
+
+    <!-- 4. Matéria negligenciada -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📌 Última vez que estudou cada matéria</div>
+      <div id="prog-negligenciada"></div>
+    </div>
+
+    <!-- 5. Semana a semana -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">📅 Semana a semana</div>
+      <div id="prog-semanas"></div>
+    </div>
+
+    <!-- 6. Horário favorito -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">🕐 Horário favorito de estudo</div>
+      <div id="prog-horario"></div>
+    </div>
+
+    <!-- 7. Velocidade de revisão -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">🔁 Velocidade de revisão</div>
+      <div id="prog-revisao-vel"></div>
+    </div>
+
+    <!-- Resumo geral -->
+    <div class="card">
+      <div class="card-title">✦ Resumo do período</div>
+      <div id="prog-resumo-wrap"></div>
+    </div>
+  </div>
+
+  <!-- PERFIL -->
+  <div id="sec-perfil" class="section">
+    <div class="perfil-hero">
+      <div class="perfil-foto-wrap" onclick="toggleAvatarPicker()">
+        <div class="perfil-foto" id="perfil-foto-preview">L</div>
+        <div class="perfil-foto-edit">✏️</div>
+      </div>
+      <div class="perfil-nome-display" id="perfil-nome-display">Luísa</div>
+      <div class="perfil-apelido" id="perfil-apelido-display">✦ IFPE 2027</div>
+    </div>
+
+    <!-- Seletor de avatares -->
+    <div id="perfil-avatar-picker" style="display:none;margin-bottom:12px">
+      <div class="perfil-section">
+        <div class="perfil-section-title">✨ Escolha seu avatar</div>
+        <div id="avatar-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px"></div>
+        <button class="perfil-save-btn" onclick="fecharAvatarPicker()" style="background:rgba(255,255,255,.06);color:#94A3B8;margin-top:0">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Dados pessoais -->
+    <div class="perfil-section">
+      <div class="perfil-section-title">🌟 Sobre mim</div>
+      <div class="form-row">
+        <div class="perfil-field">
+          <label class="perfil-label">Nome completo</label>
+          <input class="perfil-input" id="perfil-nome" placeholder="Luísa Couto Mota">
+        </div>
+        <div class="perfil-field">
+          <label class="perfil-label">Como gosta de ser chamada</label>
+          <input class="perfil-input" id="perfil-apelido" placeholder="Lu, Luísa...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="perfil-field">
+          <label class="perfil-label">Idade</label>
+          <input class="perfil-input" id="perfil-idade" type="number" placeholder="14">
+        </div>
+        <div class="perfil-field">
+          <label class="perfil-label">Signo ✨</label>
+          <select class="perfil-input" id="perfil-signo" style="background:#1E293B;color:#F1F5F9">
+            <option value="">Selecione...</option>
+            <option>♈ Áries</option><option>♉ Touro</option><option>♊ Gêmeos</option>
+            <option>♋ Câncer</option><option>♌ Leão</option><option>♍ Virgem</option>
+            <option>♎ Libra</option><option>♏ Escorpião</option><option>♐ Sagitário</option>
+            <option>♑ Capricórnio</option><option>♒ Aquário</option><option>♓ Peixes</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="perfil-field">
+          <label class="perfil-label">Música favorita 🎵</label>
+          <input class="perfil-input" id="perfil-musica" placeholder="Artista ou música...">
+        </div>
+        <div class="perfil-field">
+          <label class="perfil-label">Cor favorita 🎨</label>
+          <input class="perfil-input" id="perfil-cor" placeholder="Roxo, azul...">
+        </div>
+      </div>
+      <div class="perfil-field">
+        <label class="perfil-label">Sonho / objetivo de vida 💭</label>
+        <input class="perfil-input" id="perfil-sonho" placeholder="O que você quer ser quando crescer?">
+      </div>
+      <div class="perfil-field">
+        <label class="perfil-label">Motivação para o IFPE 🚀</label>
+        <input class="perfil-input" id="perfil-motivacao" placeholder="Por que você quer entrar no IFPE?">
+      </div>
+    </div>
+
+    <!-- Palavra-chave -->
+    <div class="perfil-section">
+      <div class="perfil-section-title">🔑 Palavra-chave de acesso</div>
+      <div class="perfil-field">
+        <label class="perfil-label">Crie sua palavra-chave secreta</label>
+        <div class="perfil-chave-wrap">
+          <input class="perfil-input" id="perfil-chave" type="password" placeholder="Só você sabe...">
+          <button class="perfil-chave-toggle" onclick="toggleChaveVis()" id="chave-eye">👁</button>
+        </div>
+        <div class="perfil-hint">Qualquer pessoa que tentar fazer uma ação no app vai precisar digitar essa palavra. Guarde bem!</div>
+        <div id="chave-status"></div>
+      </div>
+      <div class="perfil-field">
+        <label class="perfil-label">Confirmar palavra-chave</label>
+        <div class="perfil-chave-wrap">
+          <div class="perfil-chave-wrap"><input class="perfil-input" id="perfil-chave2" type="password" placeholder="Repita a palavra-chave"><button class="perfil-chave-toggle" onclick="const i=document.getElementById('perfil-chave2');i.type=i.type==='password'?'text':'password'">👁</button></div>
+        </div>
+      </div>
+      <div class="perfil-section-title" style="margin-top:14px">🐾 Recuperação de acesso</div>
+      <div class="perfil-field">
+        <label class="perfil-label">Pergunta secreta</label>
+        <select class="perfil-input" id="perfil-pergunta">
+          <option value="">Escolha uma pergunta...</option>
+          <option>Nome do meu primeiro animal de estimação</option>
+          <option>Cidade onde nasci</option>
+          <option>Nome da minha melhor amiga</option>
+          <option>Música favorita de infância</option>
+          <option>Apelido que minha mãe me chama</option>
+        </select>
+      </div>
+      <div class="perfil-field">
+        <label class="perfil-label">Resposta secreta</label>
+        <input class="perfil-input" id="perfil-resposta" type="text" placeholder="Só você sabe...">
+        <div class="perfil-hint">Guarde bem — usada para recuperar o acesso se esquecer a palavra-chave.</div>
+      </div>
+    </div>
+
+    <button class="perfil-save-btn" onclick="comAuth(()=>salvarPerfil())">✦ Salvar perfil</button>
+  </div><!-- /sec-perfil -->
+
+  <!-- METAS -->
+  <div id="sec-metas" class="section">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">🎯 Data da prova</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nome do objetivo</label>
+          <input type="text" class="form-control" id="g-objetivo" placeholder="Ex: IFPE 2027">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data da prova</label>
+          <input type="date" class="form-control" id="g-data-prova">
+        </div>
+      </div>
+      <button class="btn-primary" onclick="_authSalvarMetas()" style="margin-top:4px">✦ Salvar</button>
+    </div>
+    <div class="card">
+      <div class="card-title">✦ Metas semanais</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Horas por semana</label>
+          <input type="number" class="form-control" id="g-hours" placeholder="Ex: 10" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sessões por semana</label>
+          <input type="number" class="form-control" id="g-sessions" placeholder="Ex: 5" min="0">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:10px">
+        <label class="form-label">Questões por semana</label>
+        <input type="number" class="form-control" id="g-questions" placeholder="Ex: 50" min="0">
+      </div>
+      <button class="btn-primary" onclick="_authSalvarMetas()">✦ Salvar metas</button>
+    </div>
+    <div id="metas-progress"></div>
+    <div class="card" style="margin-top:1rem">
+      <div class="card-title">⚠️ Zerar dados por matéria</div>
+      <p style="font-size:11px;color:var(--text-secondary);margin-bottom:.5rem;line-height:1.6">Remove todas as sessões de uma matéria permanentemente. Use com cuidado.</p>
+      <div class="zerar-grid">
+        <button class="zerar-btn" onclick="_authZerar('Português')">🗑 Português</button>
+        <button class="zerar-btn" onclick="_authZerar('Matemática')">🗑 Matemática</button>
+        <button class="zerar-btn" onclick="_authZerar('Ciências da Natureza')">🗑 Ciências</button>
+        <button class="zerar-btn" onclick="_authZerar('História')">🗑 História</button>
+        <button class="zerar-btn" onclick="_authZerar('Geografia')">🗑 Geografia</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONQUISTA -->
+<div id="modal-conquista" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalConquista()">
+  <canvas id="conquista-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:9998"></canvas>
+  <div class="modal" style="text-align:center;max-width:380px;position:relative;z-index:9999">
+    <div id="mc-icon" style="font-size:5rem;margin-bottom:.75rem;animation:conquIconPulse 1s ease infinite alternate"></div>
+    <div id="mc-desbloq" style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem"></div>
+    <div id="mc-nome" style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--text-primary);font-weight:700;margin-bottom:.5rem"></div>
+    <div id="mc-desc" style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:1rem"></div>
+    <div id="mc-prog" style="font-size:12px;color:var(--text-dim);margin-bottom:1.25rem"></div>
+    <button class="btn-primary" style="width:auto;padding:9px 28px" onclick="closeModalConquista()">Fechar</button>
+  </div>
+</div>
+
+<!-- MODAL EDITAR -->
+<div id="modal-edit" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-title">✦ Editar sessão</div>
+    <input type="hidden" id="edit-id">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Matéria</label>
+        <select class="form-control" id="edit-materia">
+          <option>Português</option><option>Matemática</option>
+          <option>Ciências da Natureza</option><option>História</option><option>Geografia</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data</label>
+        <input type="date" class="form-control" id="edit-data">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label class="form-label">Assunto</label>
+      <input type="text" class="form-control" id="edit-assunto">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tempo (min)</label>
+        <input type="number" class="form-control" id="edit-min" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Banca</label>
+        <select class="form-control" id="edit-banca">
+          <option value="">Sem banca</option>
+          <option>CESPE</option><option>FGV</option><option>FCC</option>
+          <option>IBFC</option><option>FUNCERN</option><option>Outra</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Acertos</label>
+        <input type="number" class="form-control" id="edit-acertos" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Erros</label>
+        <input type="number" class="form-control" id="edit-erros" min="0">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:10px">
+      <label class="form-label">Observação</label>
+      <input type="text" class="form-control" id="edit-obs">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" style="width:auto;padding:8px 20px" onclick="salvarEdicao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="conquista-notif" id="conquista-notif">
+  <div class="conquista-notif-icon" id="cn-icon"></div>
+  <div class="conquista-notif-texto">
+    <div class="conquista-notif-titulo">✦ Conquista desbloqueada!</div>
+    <div class="conquista-notif-nome" id="cn-nome"></div>
+    <div class="conquista-notif-desc" id="cn-desc"></div>
+  </div>
+</div>
+
+
+  <div id="sec-feedback" class="section" style="max-width:860px;margin:0 auto;width:100%;padding:0 2px">
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Feedbacks &amp; Ideias
+      </div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;line-height:1.6">Encontrou um bug ou teve uma ideia? Registra aqui! Sua mãe vai ver e resolver.</p>
+      <div class="fb-form">
+        <div>
+          <div class="form-label" style="margin-bottom:8px">Tipo</div>
+          <div class="fb-tipo-grid">
+            <button class="fb-tipo-btn on" onclick="fbSetTipo(this,'bug')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 2l1.5 1.5M15.5 2 14 3.5M12 8c-2.2 0-4 1.8-4 4v3h8v-3c0-2.2-1.8-4-4-4z"/><path d="M8 15H4M20 15h-4M8 11H5M19 11h-3M10 19v2M14 19v2"/></svg>Bug</button>
+            <button class="fb-tipo-btn" onclick="fbSetTipo(this,'ideia')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Ideia</button>
+            <button class="fb-tipo-btn" onclick="fbSetTipo(this,'melhoria')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Melhoria</button>
+          </div>
+        </div>
+        <div>
+          <div class="form-label" style="margin-bottom:8px">Prioridade</div>
+          <div class="fb-prior-grid">
+            <button class="fb-prior-btn urgente" onclick="fbSetPrior(this,'urgente')">Urgente</button>
+            <button class="fb-prior-btn normal on" onclick="fbSetPrior(this,'normal')">Normal</button>
+            <button class="fb-prior-btn calma" onclick="fbSetPrior(this,'calma')">Com calma</button>
+          </div>
+        </div>
+        <div>
+          <div class="form-label" style="margin-bottom:8px">Descreva</div>
+          <textarea class="fb-textarea" id="fb-texto" placeholder="O que aconteceu? Qual é a ideia?"></textarea>
+        </div>
+        <button class="btn-primary" onclick="fbEnviar()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Enviar feedback
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Enviados
+      </div>
+      <div id="fb-lista" style="margin-top:8px"><p style="font-size:13px;color:var(--text-dim)">Nenhum feedback ainda.</p></div>
+    </div>
+  </div>
+
+<!-- TIMER FLUTUANTE -->
+<div class="float-timer hidden" id="float-timer">
+  <div class="float-timer-time" id="float-time">00:00:00</div>
+  <div class="float-timer-btns">
+    <button class="float-btn" id="float-play" onclick="floatTimerToggle()" title="Pausar/Retomar">▶</button>
+    <button class="float-btn go" onclick="irParaLancar()" title="Ir para lançamento">✦ Lançar</button>
+    <button class="float-btn" onclick="cancelarTimer()" title="Cancelar e zerar" style="color:var(--danger);border-color:var(--danger)">✕</button>
+  </div>
+</div>
+
+
+
+
+
+  </div><!-- /luia-content -->
+</div><!-- /luia-main -->
+
+<footer>
+  <div class="footer-made">Feito com ♥ por Lívia Couto · <em>Product Manager</em> / Eng.ª de Software</div>
+  <div class="footer-rights">© 2026 · Todos os direitos reservados · Luísa Couto Mota · IFPE 2027</div>
+</footer>
+
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bnav-btn active" onclick="showSection('dashboard',this,true)">
+    <svg class="bnav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dash
+  </button>
+  <button class="bnav-btn" onclick="showSection('lancar',this,true)">
+    <svg class="bnav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+    Lançar
+  </button>
+  <button class="bnav-btn" onclick="showSection('plano',this,true)">
+    <svg class="bnav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+    Plano
+  </button>
+  <button class="bnav-btn" onclick="showSection('historico',this,true)">
+    <svg class="bnav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    Histórico
+  </button>
+  <button class="bnav-btn" onclick="showSection('revisoes',this,true)">
+    <svg class="bnav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    Revisões
+  </button>
+</nav>
+
+<!-- MODAL PALAVRA-CHAVE -->
+<div id="auth-overlay" class="auth-overlay" style="display:none">
+  <div class="auth-modal">
+    <!-- Estrelinhas decorativas -->
+    <div class="auth-stars" id="auth-stars-bg"></div>
+
+    <!-- Tela principal: palavra-chave -->
+    <div id="auth-tela-principal">
+      <span class="auth-icon">✦</span>
+      <div class="auth-logo">Luia</div>
+      <div class="auth-title">Olá! Digite sua palavra-chave</div>
+      <div class="auth-sub">Para inserir ou alterar dados, confirme que é você.</div>
+      <div class="auth-input-wrap">
+        <input class="auth-input" id="auth-input" type="password" placeholder="••••••" onkeydown="if(event.key==='Enter')tentarAuth()">
+        <button class="auth-eye" onclick="const i=document.getElementById('auth-input');i.type=i.type==='password'?'text':'password'">👁</button>
+      </div>
+      <div class="auth-error" id="auth-error">Palavra-chave incorreta. Tente de novo! 🙅‍♀️</div>
+      <button class="auth-btn" onclick="tentarAuth()">✦ Confirmar acesso</button>
+      <button class="auth-cancel" onclick="irParaRecuperacao()">Esqueci minha palavra-chave</button>
+    </div>
+
+    <!-- Tela de recuperação: pergunta secreta -->
+    <div id="auth-tela-recuperar" style="display:none">
+      <span class="auth-icon">🔐</span>
+      <div class="auth-title">Recuperar acesso</div>
+      <div class="auth-sub" id="auth-pergunta-txt">Responda sua pergunta secreta:</div>
+      <input class="auth-input" id="auth-resposta" type="text" placeholder="Sua resposta..." style="letter-spacing:normal" onkeydown="if(event.key==='Enter')tentarRecuperar()">
+      <div class="auth-error" id="auth-recuperar-error">Resposta incorreta. Tente novamente!</div>
+      <button class="auth-btn" onclick="tentarRecuperar()">✓ Verificar resposta</button>
+      <button class="auth-cancel" onclick="voltarParaChave()">← Voltar</button>
+    </div>
+
+    <!-- Tela de revelação: mostra a palavra-chave -->
+    <div id="auth-tela-reveal" style="display:none">
+      <span class="auth-icon">🎉</span>
+      <div class="auth-title">Sua palavra-chave é:</div>
+      <div class="auth-chave-reveal" id="auth-chave-reveal">••••••</div>
+      <div class="auth-sub" style="margin-top:8px">Anote e não esqueça mais! Use para entrar.</div>
+      <button class="auth-btn" onclick="voltarParaChave()">← Voltar e entrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="js/app.js"></script>
+
+<!-- SEÇÃO FEEDBACK -->
+
+
+<!-- MODAL RELATÓRIO -->
+<div id="modal-relatorio" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9990;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:linear-gradient(135deg,#0F172A,#1E1B4B);border:1px solid rgba(124,58,237,.3);border-radius:16px;padding:28px;width:90%;max-width:380px">
+    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>
+      Gerar relatório
+    </div>
+    <p style="font-size:13px;color:rgba(167,139,250,.7);margin-bottom:20px">Escolha o período dos dados.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
+      <button class="rel-per-btn on" onclick="relSetPeriodo(this,7)" style="padding:12px;border:1.5px solid #7C3AED;background:rgba(124,58,237,.2);border-radius:10px;color:#A78BFA;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif">Últimos 7 dias</button>
+      <button class="rel-per-btn" onclick="relSetPeriodo(this,15)" style="padding:12px;border:1.5px solid rgba(255,255,255,.1);background:transparent;border-radius:10px;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Últimos 15 dias</button>
+      <button class="rel-per-btn" onclick="relSetPeriodo(this,30)" style="padding:12px;border:1.5px solid rgba(255,255,255,.1);background:transparent;border-radius:10px;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Últimos 30 dias</button>
+      <button class="rel-per-btn" onclick="relSetPeriodo(this,0)" style="padding:12px;border:1.5px solid rgba(255,255,255,.1);background:transparent;border-radius:10px;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Tudo</button>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('modal-relatorio').style.display='none'" style="flex:1;padding:11px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;font-family:'Inter',sans-serif">Cancelar</button>
+      <button onclick="gerarRelatorio()" style="flex:2;padding:11px;background:linear-gradient(135deg,#7C3AED,#6D28D9);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>
+        Gerar PDF
+      </button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
