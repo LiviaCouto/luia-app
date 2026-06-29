@@ -61,8 +61,25 @@ const CICLOS = [
   {nome:'Ciclo 4',subtitulo:'Simulados',periodo:'01/11–06/12',semanas:[{num:1,periodo:'01/11–09/11',topics:['Simulado parcial Port + Mat (15q)','Correção detalhada']},{num:2,periodo:'10/11–16/11',topics:['Simulado parcial Conhecimentos Gerais','Revisão dirigida']},{num:3,periodo:'17/11–23/11',topics:['Simulado completo 30q cronometrado','Análise de desempenho']},{num:4,periodo:'24/11–30/11',topics:['Revisão intensiva','Simulado completo #2']},{num:5,periodo:'01/12–06/12',topics:['Revisão leve','Descanso','Documentos para a prova']}]}
 ];
 
-const MATS = ['Português','Matemática','Ciências da Natureza','História','Geografia'];
-const MCOLOR = {'Português':'#C084FC','Matemática':'#FBBF24','Ciências da Natureza':'#4ADE80','História':'#FB923C','Geografia':'#38BDF8'};
+// Matérias e cores — dinâmicos pela prova ativa
+// Para o IFPE: 5 matérias fixas
+// Para o SSA 1: 13 matérias via getMateriasAtivas() / getCoresMateriasAtivas()
+const MATS_IFPE = ['Português','Matemática','Ciências da Natureza','História','Geografia'];
+const MCOLOR_IFPE = {'Português':'#C084FC','Matemática':'#FBBF24','Ciências da Natureza':'#4ADE80','História':'#FB923C','Geografia':'#38BDF8'};
+
+function getMatsAtivas() {
+  if (typeof getCoresMateriasAtivas === 'function' && typeof getProvaAtivaId === 'function') {
+    return typeof getMateriasAtivas === 'function' ? getMateriasAtivas() : MATS_IFPE;
+  }
+  return MATS_IFPE;
+}
+function getMColorAtivas() {
+  if (typeof getCoresMateriasAtivas === 'function') return getCoresMateriasAtivas();
+  return MCOLOR_IFPE;
+}
+// Aliases para compatibilidade com código existente
+const MATS = MATS_IFPE;
+const MCOLOR = MCOLOR_IFPE;
 const DIAS_SEMANA = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
 
 // ═══════════════════════════════════════
@@ -112,6 +129,10 @@ async function loadFromSupabase() {
     sessions = sess.map(s => ({...s, tags: s.tags || []}));
     reviews = revs;
     semanasFeitas = cics.map(c => c.ciclo_key);
+
+    // FIX REVISÕES: cria revisões para sessões que ainda não têm nenhuma
+    // Isso garante que sessões antigas ou com falha de rede ganhem revisões
+    await repararRevisoesFaltantes();
 
     // Carrega simulados do Supabase com questões respondidas
     if(simRows && simRows.length){
@@ -215,7 +236,7 @@ async function syncSession(localId) {
       sessions[idx].id = newId;
       saveLocal();
       setSyncStatus('ok','Sincronizado');
-      await createReviews(newId, sess.data, sess.assunto);
+      await createReviews(newId, sess.data, sess.assunto, sess.prova_id || 'ifpe');
     }
   } catch(e) {
     setSyncStatus('error','Erro ao sincronizar — dados salvos localmente');
@@ -223,7 +244,22 @@ async function syncSession(localId) {
   }
 }
 
-async function createReviews(sessionId, dataStr, assunto) {
+async function repararRevisoesFaltantes() {
+  const sessionsComRevisao = new Set(reviews.map(r => r.session_id));
+  const sessoesSemRevisao = sessions.filter(s => s.id && !sessionsComRevisao.has(s.id) && !s.archived);
+  if (!sessoesSemRevisao.length) return;
+  for (const s of sessoesSemRevisao) {
+    try {
+      // Passa o prova_id da sessão para que a revisão herde corretamente
+      await createReviews(s.id, s.data, s.assunto, s.prova_id || 'ifpe');
+    } catch(e) { console.error('repararRevisoes error', s.id, e); }
+  }
+}
+
+async function createReviews(sessionId, dataStr, assunto, provaId) {
+  // provaId é opcional — se não informado, usa a prova ativa
+  const _pid = provaId ||
+    (typeof getProvaAtivaId === 'function' ? getProvaAtivaId() : 'ifpe');
   const base = new Date(dataStr + 'T12:00:00');
   const ciclos = [
     {dias:1,  tipo:'1d',  label:'24h'},
@@ -235,7 +271,13 @@ async function createReviews(sessionId, dataStr, assunto) {
     for (const c of ciclos) {
       const dt = new Date(base); dt.setDate(dt.getDate() + c.dias);
       const rd = dateToLocal(dt);
-      const rev = await sbPost('reviews', {session_id: sessionId, review_date: rd, status: 'pendente', tipo: c.tipo});
+      const rev = await sbPost('reviews', {
+        session_id: sessionId,
+        review_date: rd,
+        status: 'pendente',
+        tipo: c.tipo,
+        prova_id: _pid          // ← salva prova_id na revisão
+      });
       if(rev && rev[0]) reviews.push(rev[0]);
     }
     saveLocal();
@@ -472,7 +514,8 @@ async function lancarSessao(){
 
   const assunto=sub==='Outro'?outro:sub;
   const localId='local_'+Date.now();
-  const sess={localId,id:null,materia,topico,assunto,data:data||todayLocal(),acertos,erros,minutos,obs,banca:'',tags,archived:false};
+  const _pid=typeof getProvaAtivaId==='function'?getProvaAtivaId():'ifpe';
+  const sess={localId,id:null,materia,topico,assunto,data:data||todayLocal(),acertos,erros,minutos,obs,banca:'',tags,archived:false,prova_id:_pid};
   sessions.unshift(sess);
   saveLocal();
 
@@ -503,6 +546,7 @@ async function lancarSessao(){
     showLuia(abaFinal, null);
     document.querySelectorAll('.bnav-btn').forEach((b,i)=>{b.classList.remove('active');if(i===0)b.classList.add('active');});
     verificarConquistas();
+    verificarRank();  // verifica subida de rank após registrar sessão
   }, 800);
 
   await syncSession(localId);
@@ -567,9 +611,14 @@ function setFilter(m,btn){filterMode2=m;document.querySelectorAll('.filter-tab')
 function renderHistorico(){
   const q=(document.getElementById('search-input')?.value||'').toLowerCase();
   const wrap=document.getElementById('historico-list');
+  const pid=typeof getProvaAtivaId==='function'?getProvaAtivaId():null;
   let list=sessions.filter(s=>{
     if(filterMode2==='ativas') return !s.archived;
     if(filterMode2==='arquivadas') return s.archived;
+    return true;
+  }).filter(s=>{
+    // Filtra pela prova ativa — sessões sem prova_id são consideradas IFPE
+    if(pid) return (s.prova_id||'ifpe')===pid;
     return true;
   }).filter(s=>{
     if(!q) return true;
@@ -581,7 +630,7 @@ function renderHistorico(){
     const id=uid(s);
     const isArq=s.archived;
     return '<div class="log-item" style="'+(isArq?'opacity:.6':'')+'">'+
-      '<div class="log-mat-dot" style="background:'+(MCOLOR[s.materia]||'#888')+'"></div>'+
+      '<div class="log-mat-dot" style="background:'+(getMColorAtivas()[s.materia]||'#888')+'"></div>'+
       '<div class="log-info">'+
         '<div class="log-title">'+s.assunto+(isArq?' <span style="font-size:9px;color:var(--text-dim)">[arquivada]</span>':'')+'</div>'+
         '<div class="log-sub">'+s.materia+' · '+s.topico+' · '+fmtDate(s.data)+(s.banca?' · '+s.banca:'')+(s.obs?' · '+s.obs:'')+'</div>'+
@@ -664,8 +713,8 @@ function renderRevisoes(){
 
   // ── ABA HOJE ──
   if(revFilter2==='hoje'){
-    const atrasadas=reviews.filter(r=>r.review_date<today&&r.status==='pendente').sort((a,b)=>a.review_date.localeCompare(b.review_date));
-    const deHoje=reviews.filter(r=>r.review_date===today&&r.status==='pendente');
+    const atrasadas=_revFiltradas.filter(r=>r.review_date<today&&r.status==='pendente').sort((a,b)=>a.review_date.localeCompare(b.review_date));
+    const deHoje=_revFiltradas.filter(r=>r.review_date===today&&r.status==='pendente');
     if(!atrasadas.length&&!deHoje.length){
       wrap.innerHTML=`<div style="text-align:center;padding:40px 20px">
         <div style="font-size:2.5rem;margin-bottom:12px">🎉</div>
@@ -689,7 +738,7 @@ function renderRevisoes(){
 
   // ── ABA PRÓXIMAS ──
   if(revFilter2==='proximas'){
-    const proximas=reviews.filter(r=>r.review_date>today&&r.status==='pendente').sort((a,b)=>a.review_date.localeCompare(b.review_date));
+    const proximas=_revFiltradas.filter(r=>r.review_date>today&&r.status==='pendente').sort((a,b)=>a.review_date.localeCompare(b.review_date));
     if(!proximas.length){
       wrap.innerHTML='<p style="color:var(--text-dim);font-size:13px;padding:1rem 0">Nenhuma revisão futura agendada.</p>';
       return;
@@ -709,7 +758,7 @@ function renderRevisoes(){
   }
 
   // ── ABA CONCLUÍDAS ──
-  const concluidas=reviews.filter(r=>r.status==='concluida').sort((a,b)=>b.review_date.localeCompare(a.review_date));
+  const concluidas=_revFiltradas.filter(r=>r.status==='concluida').sort((a,b)=>b.review_date.localeCompare(a.review_date));
   if(!concluidas.length){
     wrap.innerHTML='<p style="color:var(--text-dim);font-size:13px;padding:1rem 0">Nenhuma revisão concluída ainda.</p>';
     return;
@@ -731,7 +780,7 @@ function atualizarRevDash(){
   function tipoColor(tipo){return {'1d':'var(--info)','7d':'var(--accent-light)','15d':'var(--warning)','30d':'var(--success)'}[tipo]||'var(--text-dim)';}
   function tipoBadge(tipo){const cor=tipoColor(tipo);return `<span style="font-size:9px;font-weight:700;color:${cor};background:${cor}22;border:1px solid ${cor}44;border-radius:99px;padding:2px 8px;white-space:nowrap">🔁 ${tipoLabel(tipo)}</span>`;}
 
-  const pendHoje=reviews.filter(r=>r.review_date===today&&r.status==='pendente');
+  const pendHoje=_revFiltradas.filter(r=>r.review_date===today&&r.status==='pendente');
   const card=document.getElementById('rev-dash-card');
   const list2=document.getElementById('rev-dash-list');
   if(!card) return;
@@ -994,7 +1043,7 @@ function dispararFogos(){
 
 const PLANO_DATA = [
   {semana:'1',periodo:'22/06–28/06',dias:[
-    {data:'2026-06-22',dia:'Seg',conteudo:'PORT · Leitura e interpretação: informações explícitas e implícitas — 10 questões IFPE',mat:'Português'},
+    {data:'2026-06-22',dia:'Seg',conteudo:'PORT · Leitura e interpretação: informações explícitas e implícitas — 10 questões',mat:'Português'},
     {data:'2026-06-23',dia:'Ter',conteudo:'MAT · Números: frações (operações, simplificação e problemas) — teoria + 10 questões',mat:'Matemática'},
     {data:'2026-06-24',dia:'Qua',conteudo:'CIÊ · Ecologia: componentes do ecossistema, cadeias e teias alimentares',mat:'Ciências da Natureza'},
     {data:'2026-06-25',dia:'Qui',conteudo:'PORT · Intenção comunicativa e fato × opinião — 10 questões',mat:'Português'},
@@ -1129,8 +1178,8 @@ const PLANO_DATA = [
     {data:'2026-10-04',dia:'Dom',conteudo:'Simulado: 15 Port + 15 Mat — análise de desempenho',mat:'Geral'},
   ]},
   {semana:'16',periodo:'05/10–11/10',dias:[
-    {data:'2026-10-05',dia:'Seg',conteudo:'PORT · Revisão Port I: interpretação + tipologia + gêneros — 15 questões IFPE antigas',mat:'Português'},
-    {data:'2026-10-06',dia:'Ter',conteudo:'MAT · Revisão Mat I: números, proporcionalidade, porcentagem — 15 questões IFPE antigas',mat:'Matemática'},
+    {data:'2026-10-05',dia:'Seg',conteudo:'PORT · Revisão Port I: interpretação + tipologia + gêneros — 15 questões estilo vestibular',mat:'Português'},
+    {data:'2026-10-06',dia:'Ter',conteudo:'MAT · Revisão Mat I: números, proporcionalidade, porcentagem — 15 questões estilo vestibular',mat:'Matemática'},
     {data:'2026-10-07',dia:'Qua',conteudo:'CIÊ · Evolução: Lamarck, Darwin e seleção natural — 10 questões',mat:'Ciências da Natureza'},
     {data:'2026-10-08',dia:'Qui',conteudo:'PORT · Revisão Port II: coesão, coerência, semântica — 15 questões',mat:'Português'},
     {data:'2026-10-09',dia:'Sex',conteudo:'MAT · Revisão Mat II: álgebra, equações e sistemas — 15 questões',mat:'Matemática'},
@@ -1159,16 +1208,16 @@ const PLANO_DATA = [
     {data:'2026-10-26',dia:'Seg',conteudo:'HIST · Nova República (1985–): redemocratização, Constituição de 1988',mat:'História'},
     {data:'2026-10-27',dia:'Ter',conteudo:'GEO · Energia no Brasil e no mundo: fontes renováveis e não-renováveis',mat:'Geografia'},
     {data:'2026-10-28',dia:'Qua',conteudo:'CIÊ · Revisão CG III: genética, evolução e saúde — 15 questões',mat:'Ciências da Natureza'},
-    {data:'2026-10-29',dia:'Qui',conteudo:'HIST · Revisão Hist I: mundo contemporâneo — 15 questões IFPE antigas',mat:'História'},
+    {data:'2026-10-29',dia:'Qui',conteudo:'HIST · Revisão Hist I: mundo contemporâneo — 15 questões estilo vestibular',mat:'História'},
     {data:'2026-10-30',dia:'Sex',conteudo:'GEO · Questão agrária, espaço rural e Reforma Agrária no Brasil',mat:'Geografia'},
     {data:'2026-10-31',dia:'Sáb',conteudo:'HIST · Revisão Hist II: Brasil contemporâneo — 15 questões',mat:'História'},
     {data:'2026-11-01',dia:'Dom',conteudo:'Simulado completo #3: 30 questões — foco nos pontos fracos',mat:'Geral'},
   ]},
   {semana:'20',periodo:'02/11–08/11',dias:[
-    {data:'2026-11-02',dia:'Seg',conteudo:'PORT · Simulado específico Port: 20 questões estilo IFPE — análise',mat:'Português'},
-    {data:'2026-11-03',dia:'Ter',conteudo:'MAT · Simulado específico Mat: 20 questões estilo IFPE — análise',mat:'Matemática'},
+    {data:'2026-11-02',dia:'Seg',conteudo:'PORT · Simulado específico Port: 20 questões estilo vestibular — análise',mat:'Português'},
+    {data:'2026-11-03',dia:'Ter',conteudo:'MAT · Simulado específico Mat: 20 questões estilo vestibular — análise',mat:'Matemática'},
     {data:'2026-11-04',dia:'Qua',conteudo:'GEO · Revisão Geo I: cartografia, estrutura da Terra, relevo — 15 questões',mat:'Geografia'},
-    {data:'2026-11-05',dia:'Qui',conteudo:'CIÊ · Simulado específico CG: 20 questões estilo IFPE — análise',mat:'Ciências da Natureza'},
+    {data:'2026-11-05',dia:'Qui',conteudo:'CIÊ · Simulado específico CG: 20 questões estilo vestibular — análise',mat:'Ciências da Natureza'},
     {data:'2026-11-06',dia:'Sex',conteudo:'GEO · Revisão Geo II: clima, vegetação, hidrografia — 15 questões',mat:'Geografia'},
     {data:'2026-11-07',dia:'Sáb',conteudo:'Simulado completo #4: 30 questões cronometrado',mat:'Geral'},
     {data:'2026-11-08',dia:'Dom',conteudo:'Análise aprofundada: mapear matérias com maior % de erro',mat:'Geral'},
@@ -1183,10 +1232,10 @@ const PLANO_DATA = [
     {data:'2026-11-15',dia:'Dom',conteudo:'Descanso ativo: reler resumos sem fazer questões',mat:'Geral'},
   ]},
   {semana:'22',periodo:'16/11–22/11',dias:[
-    {data:'2026-11-16',dia:'Seg',conteudo:'PORT · Revisão final Port: 15 questões das mais cobradas no IFPE',mat:'Português'},
-    {data:'2026-11-17',dia:'Ter',conteudo:'MAT · Revisão final Mat: 15 questões das mais cobradas no IFPE',mat:'Matemática'},
-    {data:'2026-11-18',dia:'Qua',conteudo:'CIÊ · Revisão final CG: 15 questões das mais cobradas no IFPE',mat:'Ciências da Natureza'},
-    {data:'2026-11-19',dia:'Qui',conteudo:'HIST/GEO · Revisão final: 15 questões das mais cobradas no IFPE',mat:'História'},
+    {data:'2026-11-16',dia:'Seg',conteudo:'PORT · Revisão final Port: 15 questões das mais cobradas',mat:'Português'},
+    {data:'2026-11-17',dia:'Ter',conteudo:'MAT · Revisão final Mat: 15 questões das mais cobradas',mat:'Matemática'},
+    {data:'2026-11-18',dia:'Qua',conteudo:'CIÊ · Revisão final CG: 15 questões das mais cobradas',mat:'Ciências da Natureza'},
+    {data:'2026-11-19',dia:'Qui',conteudo:'HIST/GEO · Revisão final: 15 questões das mais cobradas',mat:'História'},
     {data:'2026-11-20',dia:'Sex',conteudo:'Simulado completo #6: 30 questões — condições reais de prova',mat:'Geral'},
     {data:'2026-11-21',dia:'Sáb',conteudo:'Revisão leve dos erros do simulado',mat:'Geral'},
     {data:'2026-11-22',dia:'Dom',conteudo:'Descanso total — sem estudos',mat:'Geral'},
@@ -1225,7 +1274,7 @@ const PLANO_DATA = [
     {data:'2026-12-17',dia:'Qui',conteudo:'Descanso — dormir cedo',mat:'Geral'},
     {data:'2026-12-18',dia:'Sex',conteudo:'Confirmar local de prova, documentos e horário',mat:'Geral'},
     {data:'2026-12-19',dia:'Sáb',conteudo:'Descanso total. Dorme cedo. Você consegue! 🌟',mat:'Geral'},
-    {data:'2026-12-20',dia:'Dom',conteudo:'🎯 DIA DA PROVA — IFPE 2027 · Boa sorte, Luísa!',mat:'Geral'},
+    {data:'2026-12-20',dia:'Dom',conteudo:'🎯 DIA DA PROVA · Boa sorte, Luísa!',mat:'Geral'},
   ]},
 ];
 
@@ -1243,7 +1292,11 @@ function savePlano(){
 
 function renderPlano(){
   const wrap=document.getElementById('plano-list');
+  if(!wrap) return;
   const today=todayLocal();
+  // SSA 1 e outras provas: usa plano do banco (plano_dias)
+  const _provaAtualId=typeof getProvaAtivaId==='function'?getProvaAtivaId():'ifpe';
+  if(_provaAtualId !== 'ifpe'){_renderPlanoBanco(wrap,today,_provaAtualId);return;}
   const MAT_BADGE={'Português':'badge-port','Matemática':'badge-mat','Ciências da Natureza':'badge-bio','História':'badge-hist','Geografia':'badge-geo','Geral':'badge-rev'};
 
   wrap.innerHTML=PLANO_DATA.map((sem,si)=>{
@@ -1304,6 +1357,96 @@ function renderPlano(){
   }).join('');
 }
 
+// ── PLANO DO BANCO (SSA 1 e outras provas) ────────────
+// Carrega plano_dias do Supabase e renderiza.
+async function _renderPlanoBanco(wrap, today, provaId) {
+  wrap.innerHTML = '<p style="color:var(--text-dim);font-size:13px">Carregando plano...</p>';
+  try {
+    const rows = await sbGet('plano_dias', `prova_id=eq.${provaId}&order=data.asc`);
+    if (!rows || !rows.length) {
+      wrap.innerHTML = '<div style="text-align:center;padding:32px 16px">' +
+        '<div style="font-size:2rem;margin-bottom:12px">📋</div>' +
+        '<div style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:8px">Plano ainda não gerado</div>' +
+        '<div style="font-size:13px;color:var(--text-dim);margin-bottom:16px">Adicione um edital para gerar seu plano de estudos automaticamente.</div>' +
+        '<button onclick="abrirNovaProva()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px 24px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">✦ Adicionar edital</button>' +
+      '</div>';
+      return;
+    }
+    // Agrupa por semana
+    const semanas = {};
+    rows.forEach(d => {
+      const dt = new Date(d.data + 'T12:00');
+      const sem = _getSemanaLabel(dt);
+      if (!semanas[sem]) semanas[sem] = [];
+      semanas[sem].push(d);
+    });
+    const MCOLORES = typeof getMColorAtivas === 'function' ? getMColorAtivas() : MCOLOR_IFPE;
+    wrap.innerHTML = Object.entries(semanas).map(([sem, dias]) => {
+      const feitos = dias.filter(d => d.feito).length;
+      const pct = Math.round(feitos / dias.length * 100);
+      const isCurrent = dias.some(d => d.data >= today);
+      return '<div class="plano-semana">' +
+        '<div class="plano-semana-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">' +
+          '<div>' +
+            '<div class="plano-semana-titulo">' + sem + '</div>' +
+            '<div style="font-size:10px;color:var(--text-dim);margin-top:2px">' + feitos + ' de ' + dias.length + ' dias · ' + pct + '%</div>' +
+          '</div>' +
+          '<div style="width:60px;height:4px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden">' +
+            '<div style="height:100%;width:' + pct + '%;background:var(--accent);border-radius:99px"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="plano-semana-body" style="display:' + (isCurrent ? 'block' : 'none') + '">' +
+          dias.map(d => {
+            const isDone = d.feito;
+            const isToday = d.data === today;
+            const cor = MCOLORES[d.materia] || '#888';
+            return '<div class="plano-dia' + (isDone ? ' done' : '') + (isToday ? ' hoje' : '') + '">' +
+              '<div class="plano-dia-header">' +
+                '<span class="plano-dia-label">' + fmtDate(d.data) + '</span>' +
+                '<button onclick="_togglePlanoBanco(this,\'' + d.id + '\',' + d.feito + ')" ' +
+                  'class="plano-check' + (isDone ? ' done' : '') + '" title="' + (isDone ? 'Desmarcar' : 'Marcar como feito') + '">' +
+                  (isDone ? '✓' : '○') +
+                '</button>' +
+              '</div>' +
+              '<div class="plano-dia-conteudo">' + (d.conteudo || d.topico || '') + '</div>' +
+              '<span class="bloco-badge" style="background:' + cor + '22;color:' + cor + ';border:1px solid ' + cor + '44">' + (d.materia || '') + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    wrap.innerHTML = '<p style="color:var(--text-dim);font-size:13px">Erro ao carregar o plano.</p>';
+    console.error('_renderPlanoBanco error:', e);
+  }
+}
+
+async function _togglePlanoBanco(btn, diaId, atualFeito) {
+  const novoFeito = !atualFeito;
+  try {
+    await fetch(`${SUPA_URL}/rest/v1/plano_dias?id=eq.${diaId}`, {
+      method: 'PATCH', headers: { ...H, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ feito: novoFeito })
+    });
+    btn.textContent = novoFeito ? '✓' : '○';
+    btn.classList.toggle('done', novoFeito);
+    btn.closest('.plano-dia').classList.toggle('done', novoFeito);
+    btn.setAttribute('onclick', '_togglePlanoBanco(this,\'' + diaId + '\',' + novoFeito + ')');
+    verificarConquistas();
+  } catch(e) { showToast('Erro ao atualizar o plano.', 'error'); }
+}
+
+function _getSemanaLabel(dt) {
+  const ano = dt.getFullYear();
+  const d = new Date(dt);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - d.getDay() + 1); // Segunda-feira
+  const ini = fmtDate(dateToLocal(d));
+  d.setDate(d.getDate() + 6);
+  const fim = fmtDate(dateToLocal(d));
+  return 'Semana de ' + ini + ' a ' + fim;
+}
+
 // ═══════════════════════════════════════
 //  CRUZAMENTO AUTOMÁTICO SESSÕES → PLANO
 // ═══════════════════════════════════════
@@ -1355,6 +1498,7 @@ function togglePlano(data, el){
   renderDashboard();
   atualizarContador();
   verificarConquistas();
+  verificarRank();
 }
 
 // ═══════════════════════════════════════
@@ -1365,7 +1509,7 @@ async function salvarMetas(){
   const s=parseInt(document.getElementById('g-sessions').value)||0;
   const q=parseInt(document.getElementById('g-questions').value)||0;
   const dataProva=document.getElementById('g-data-prova')?.value||goals.data_prova||'2026-12-20';
-  const objetivo=document.getElementById('g-objetivo')?.value.trim()||goals.objetivo||'IFPE 2027';
+  const objetivo=document.getElementById('g-objetivo')?.value.trim()||goals.objetivo||(typeof getProvaAtiva==='function'?getProvaAtiva().nome:'SSA 1 · UPE');
   goals={...goals,weekly_hours:h,weekly_sessions:s,weekly_questions:q,data_prova:dataProva,objetivo};
   saveLocal();renderMetas();renderDashMetas();atualizarContador();showToast('Metas salvas! ✦','success');
   try{
@@ -1381,7 +1525,7 @@ function renderMetas(){
   document.getElementById('g-sessions').value=goals.weekly_sessions||'';
   document.getElementById('g-questions').value=goals.weekly_questions||'';
   if(document.getElementById('g-data-prova')) document.getElementById('g-data-prova').value=goals.data_prova||'2026-12-20';
-  if(document.getElementById('g-objetivo')) document.getElementById('g-objetivo').value=goals.objetivo||'IFPE 2027';
+  if(document.getElementById('g-objetivo')) document.getElementById('g-objetivo').value=goals.objetivo||(typeof getProvaAtiva==='function'?getProvaAtiva().nome:'SSA 1 · UPE');
 
   const now=new Date();
   const startW=new Date(now);startW.setDate(now.getDate()-now.getDay());startW.setHours(0,0,0,0);
@@ -1427,14 +1571,14 @@ function renderCronograma(){
 // ═══════════════════════════════════════
 //  CICLOS
 // ═══════════════════════════════════════
-function renderCicloNav(){document.getElementById('ciclo-nav').innerHTML=CICLOS.map((c,i)=>`<button class="ciclo-btn ${i===currentCiclo?'active':''}" onclick="selectCiclo(${i})">${c.nome}</button>`).join('');}
+function renderCicloNav(){const _cn=document.getElementById('ciclo-nav');if(!_cn)return;_cn.innerHTML=CICLOS.map((c,i)=>`<button class="ciclo-btn ${i===currentCiclo?'active':''}" onclick="selectCiclo(${i})">${c.nome}</button>`).join('');}
 function selectCiclo(i){currentCiclo=i;renderCicloNav();renderCicloContent();}
 function renderCicloContent(){
   const c=CICLOS[currentCiclo];
   const total=c.semanas.length;
   const done=c.semanas.filter((_,si)=>semanasFeitas.includes(`${currentCiclo}-${si}`)).length;
   const pct=Math.round(done/total*100);
-  document.getElementById('ciclo-content').innerHTML=`
+  const _ccEl=document.getElementById('ciclo-content');if(!_ccEl)return;_ccEl.innerHTML=`
     <div class="card" style="margin-bottom:1rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-size:13px;font-weight:600;color:var(--accent-light)">${c.nome} — ${c.subtitulo}</span>
@@ -1468,6 +1612,7 @@ async function toggleSemana(key,el){
 function renderHeatmap(){
   const grid=document.getElementById('heatmap-grid');
   const months=document.getElementById('heatmap-months');
+  if(!grid||!months)return;
   const today=new Date();
   const WEEKS=26;
   const start=new Date(today);
@@ -1694,15 +1839,18 @@ function renderDashMetas(){
 function renderDashboard(){
   // Sincroniza plano com sessões antes de qualquer render
   sincronizarPlanoComSessoes();
+  // Injeta seletor de prova no dashboard
+  _renderFiltroProva('dash-filtro-prova', 'setDashProva');
 
-  const ativas=sessions.filter(s=>!s.archived);
+  const ativas=filtrarSessoes(typeof dashProva!=='undefined'?dashProva:'ativa');
   const total=ativas.length;
   const totalQSess=ativas.reduce((a,s)=>a+s.acertos+s.erros,0);
   const totalASess=ativas.reduce((a,s)=>a+s.acertos,0);
   const totalMin=ativas.reduce((a,s)=>a+(s.minutos||0),0);
-  // Soma questões dos simulados
-  const totalQSim=simHistorico.reduce((a,s)=>a+(s.total||0),0);
-  const totalASim=simHistorico.reduce((a,s)=>a+(s.acertos||0),0);
+  // Soma questões dos simulados da prova ativa
+  const _simAtivosD=filtrarSimHistorico(typeof dashProva!=='undefined'?dashProva:'ativa');
+  const totalQSim=_simAtivosD.reduce((a,s)=>a+(s.total||0),0);
+  const totalASim=_simAtivosD.reduce((a,s)=>a+(s.acertos||0),0);
   const totalQ=totalQSess+totalQSim;
   const totalA=totalASess+totalASim;
   const pct=totalQ>0?Math.round(totalA/totalQ*100)+'%':'—';
@@ -1724,10 +1872,11 @@ function renderDashboard(){
     renderSimDash();
   }
   verificarConquistas(true);
+  renderRank();  // atualiza badge de rank no hero do dashboard
 }
 
 function renderProgressMat(){
-  document.getElementById('progress-list').innerHTML=MATS.map(m=>{
+  document.getElementById('progress-list').innerHTML=getMatsAtivas().map(m=>{
     const sess=sessions.filter(s=>s.materia===m);
     const a=sess.reduce((t,s)=>t+s.acertos,0);const e=sess.reduce((t,s)=>t+s.erros,0);const tot=a+e;
     const pct=tot>0?Math.round(a/tot*100):0;const col=MCOLOR[m]||'#888';
@@ -1742,16 +1891,16 @@ const GRID={color:'rgba(168,85,247,0.1)'};const TICK={color:'#9B8EC4',font:{size
 function mkChart(id,config){if(charts[id])charts[id].destroy();const ctx=document.getElementById(id);if(!ctx)return;charts[id]=new Chart(ctx,config);}
 
 function renderChartTempo(){
-  const data=MATS.map(m=>sessions.filter(s=>s.materia===m).reduce((t,s)=>t+(s.minutos||0),0));
+  const data=getMatsAtivas().map(m=>filtrarSessoes(typeof dashProva!=="undefined"?dashProva:"ativa").filter(s=>s.materia===m).reduce((t,s)=>t+(s.minutos||0),0));
   const total=data.reduce((a,b)=>a+b,0);const hasData=total>0;
   document.getElementById('empty-tempo').style.display=hasData?'none':'flex';
   document.getElementById('chart-tempo-inner').style.display=hasData?'block':'none';
   if(!hasData){if(charts['chartTempo']){charts['chartTempo'].destroy();delete charts['chartTempo'];}return;}
-  const colors=MATS.map(m=>MCOLOR[m]);
+  const colors=getMatsAtivas().map(m=>getMColorAtivas()[m]||"#888");
   const tempoTooltip = function(ctx) { return ' '+ctx.label+': '+ctx.parsed+'min ('+Math.round(ctx.parsed/total*100)+'%)'; };
-  mkChart('chartTempo',{type:'doughnut',data:{labels:MATS,datasets:[{data,backgroundColor:colors.map(c=>c+'CC'),borderColor:colors,borderWidth:2,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:tempoTooltip}}}}});
+  mkChart('chartTempo',{type:'doughnut',data:{labels:getMatsAtivas(),datasets:[{data,backgroundColor:colors.map(c=>c+'CC'),borderColor:colors,borderWidth:2,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:tempoTooltip}}}}});
   document.getElementById('donut-center').innerHTML='<div class="donut-total">'+total+'</div><div class="donut-sub">minutos</div>';
-  document.getElementById('tempo-legend').innerHTML=MATS.map((m,i)=>data[i]>0?'<div class="legend-row"><div class="legend-dot" style="background:'+MCOLOR[m]+'"></div><span class="legend-name">'+m.split(' ')[0]+'</span><span class="legend-val">'+data[i]+'min · '+Math.round(data[i]/total*100)+'%</span></div>':'').join('');
+  document.getElementById('tempo-legend').innerHTML=getMatsAtivas().map((m,i)=>data[i]>0?'<div class="legend-row"><div class="legend-dot" style="background:'+MCOLOR[m]+'"></div><span class="legend-name">'+m.split(' ')[0]+'</span><span class="legend-val">'+data[i]+'min · '+Math.round(data[i]/total*100)+'%</span></div>':'').join('');
 }
 
 function renderChartMateria(){
@@ -1759,7 +1908,7 @@ function renderChartMateria(){
   document.getElementById('empty-mat').style.display=hasData?'none':'flex';
   document.getElementById('chart-mat-inner').style.display=hasData?'block':'none';
   if(!hasData)return;
-  document.getElementById('mat-bars').innerHTML=MATS.map(m=>{
+  document.getElementById('mat-bars').innerHTML=getMatsAtivas().map(m=>{
     const sess=sessions.filter(s=>s.materia===m);const a=sess.reduce((t,s)=>t+s.acertos,0);const e=sess.reduce((t,s)=>t+s.erros,0);const tot=a+e;
     if(tot===0)return'';const pct=Math.round(a/tot*100);const col=MCOLOR[m];
     return`<div class="hbar-row"><div class="hbar-label"><span class="hbar-name">${m}</span><span class="hbar-pct">${pct}% · ${a}✓ ${e}✗</span></div>
@@ -1791,8 +1940,8 @@ function renderChartEvolucao(){
     return ma!==mb?ma-mb:da-db;
   });
   const hasData=labels.length>=1&&sessions.some(s=>s.acertos+s.erros>0);
-  document.getElementById('empty-ev').style.display=hasData?'none':'flex';
-  document.getElementById('chart-ev-inner').style.display=hasData?'block':'none';
+  const _emptyEv=document.getElementById('empty-ev');if(_emptyEv)_emptyEv.style.display=hasData?'none':'flex';
+  const _chartEvI=document.getElementById('chart-ev-inner');if(_chartEvI)_chartEvI.style.display=hasData?'block':'none';
   if(!hasData){if(charts['chartEvolucao']){charts['chartEvolucao'].destroy();delete charts['chartEvolucao'];}return;}
   const pcts=labels.map(w=>{const t=byW[w].a+byW[w].e;return t>0?Math.round(byW[w].a/t*100):0;});
   mkChart('chartEvolucao',{type:'line',data:{labels,datasets:[{label:'% Acertos',data:pcts,borderColor:'#A855F7',backgroundColor:'rgba(168,85,247,0.12)',tension:.4,fill:true,pointBackgroundColor:'#C084FC',pointRadius:6,pointHoverRadius:8,borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.parsed.y+'% de acertos'}}},scales:{x:{ticks:TICK,grid:GRID},y:{min:0,max:100,ticks:{...TICK,stepSize:25,callback:v=>v+'%'},grid:GRID}}}});
@@ -1996,7 +2145,7 @@ function bvMostrar(){
     document.getElementById('bv-sub').innerHTML = 'Digite sua palavra-chave para carregar seus dados.';
   } else {
     document.getElementById('bv-title').textContent = 'Bem-vinda ao Luia! ✨';
-    document.getElementById('bv-sub').innerHTML = 'Sua plataforma de estudos para o IFPE 2027.<br>Digite sua palavra-chave para entrar.';
+    document.getElementById('bv-sub').innerHTML = 'Sua plataforma de estudos · '+(typeof getProvaAtiva==='function'?getProvaAtiva().nome:'SSA 1 · UPE')+'.<br>Digite sua palavra-chave para entrar.';
   }
   document.getElementById('bv-overlay').style.display='flex';
   setTimeout(()=>document.getElementById('bv-input').focus(),200);
@@ -2127,24 +2276,7 @@ function showLuia(id, btn){
   showSection(id, null, false);
 }
 
-function updateWelcome(){
-  const prova=new Date('2026-12-20');
-  const diff=Math.ceil((prova-new Date())/(1000*60*60*24));
-  const sub=document.getElementById('welcome-sub');
-  const cd=document.getElementById('welcome-countdown');
-  if(!sub) return;
-  const ativas=(sessions||[]).filter(s=>!s.archived);
-  if(ativas.length>0){
-    const totalQ=ativas.reduce((a,s)=>a+s.acertos+s.erros,0);
-    const totalA=ativas.reduce((a,s)=>a+s.acertos,0);
-    const pct=totalQ>0?Math.round(totalA/totalQ*100):0;
-    sub.textContent='Você tem '+ativas.length+' registro'+(ativas.length>1?'s':'')+', '+pct+'% de acertos e '+diff+' dias para a prova. Bora!';
-  } else {
-    sub.textContent='Faltam '+diff+' dias para o IFPE 2027. Vamos começar!';
-  }
-  // Remove o pill duplicado
-  if(cd) cd.style.display='none';
-}
+// updateWelcome: versão unificada abaixo (linha ~3092)
 
 // Sidebar mobile
 function abrirSidebar(){
@@ -2214,6 +2346,7 @@ function carregarPerfil(){
   if(document.getElementById('perfil-signo')&&p.signo) document.getElementById('perfil-signo').value=p.signo;
   atualizarStatusChave();
   atualizarSidebar();
+  renderRank();  // atualiza card de rank no perfil
 }
 
 function atualizarSidebar(){
@@ -2238,7 +2371,7 @@ function atualizarSidebar(){
   const nd=document.getElementById('perfil-nome-display');
   if(nd) nd.textContent=apelido;
   const ad=document.getElementById('perfil-apelido-display');
-  if(ad) ad.textContent=(p.signo?p.signo+' · ':'')+' IFPE 2027';
+  if(ad) ad.textContent=(p.signo?p.signo+' · ':'')+' '+(typeof getProvaAtiva==='function'?getProvaAtiva().nome:'SSA 1 · UPE');
 
   // Welcome hero greeting
   const g=document.querySelector('.luia-hero-greeting');
@@ -2512,8 +2645,11 @@ document.addEventListener('click',function(e){
 const MATS_CORES={'Português':'#A78BFA','Matemática':'#FBBF24','Ciências da Natureza':'#4ADE80','História':'#FB923C','Geografia':'#38BDF8'};
 
 function renderProgresso(){
+  // ── FILTRO DE PROVA (injeta no topo da seção) ──
+  _renderFiltroProva('prog-filtro-prova', 'setProgProva');
+
   const ativas=filtrarSessoesPeriodo();
-  const allAtivas=sessions.filter(s=>!s.archived);
+  const allAtivas=filtrarSessoes(progProva);
   const today=todayLocal();
 
   // ── 1. ALERTA DA SEMANA (IA) ──
@@ -2821,7 +2957,7 @@ function renderSobreMim(){
   const grid=document.getElementById('sobre-grid');
   if(foto) foto.innerHTML=p.foto?`<img src="${p.foto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:(p.avatarSvg||inicial);
   if(nome) nome.textContent=p.nome||'Luísa Couto Mota';
-  if(signo) signo.textContent=(p.signo||'')+(p.signo?' · ':'')+' IFPE 2027';
+  if(signo) signo.textContent=(p.signo||'')+(p.signo?' · ':'')+' '+(typeof getProvaAtiva==='function'?getProvaAtiva().nome:'SSA 1 · UPE');
   const itens=[
     {label:'Como gosta de ser chamada',val:p.apelido,icon:'👋'},
     {label:'Idade',val:p.idade?p.idade+' anos':'—',icon:'🎂'},
@@ -2874,17 +3010,91 @@ function toggleRecadoOrdem(){
   renderRecado();
 }
 
-// ── RELATÓRIO DE PROGRESSO ──
+// ── RENDER DO SELETOR DE PROVA (Progresso + Dashboard) ──
+function _renderFiltroProva(containerId, callbackFn) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const provas = typeof PROVAS_DISPONIVEIS !== 'undefined' ? PROVAS_DISPONIVEIS : {};
+  const atual = typeof progProva !== 'undefined' ? progProva : 'ativa';
+  const opcoes = [{ id:'all', nome:'Todas', icone:'🗂️' }, { id:'ativa', nome:'Ativa', icone:'✦' }];
+  Object.values(provas).forEach(p => opcoes.push({ id: p.id, nome: p.nome, icone: p.icone }));
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">' +
+    '<span style="font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;margin-right:4px">Prova:</span>' +
+    opcoes.map(o =>
+      '<button data-tipo="prova" onclick="' + callbackFn + '(\'' + o.id + '\',this)" ' +
+        'style="font-size:11px;padding:4px 11px;border-radius:99px;border:1px solid ' +
+        (atual === o.id ? 'var(--accent)' : 'rgba(255,255,255,.1)') + ';' +
+        'background:' + (atual === o.id ? 'rgba(139,92,246,.2)' : 'transparent') + ';' +
+        'color:' + (atual === o.id ? '#A78BFA' : 'var(--text-dim)') + ';cursor:pointer;font-family:inherit">' +
+        o.icone + ' ' + o.nome + '</button>'
+    ).join('') +
+  '</div>';
+}
+
+// ── FILTROS DE PROGRESSO ──
 let progPeriodo=7;
+// 'all' = todas as provas | 'ativa' = prova ativa | 'ifpe' | 'ssa1' | etc.
+let progProva='ativa';
+
 function setProgPeriodo(dias,btn){
   progPeriodo=dias;
-  document.querySelectorAll('#sec-progresso .filter-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#sec-progresso .filter-tab[data-tipo="periodo"]').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderProgresso();
 }
 
+function setProgProva(provaId,btn){
+  progProva=provaId;
+  document.querySelectorAll('#sec-progresso .filter-tab[data-tipo="prova"]').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderProgresso();
+}
+
+// Dashboard também tem filtro de prova (independente do Progresso)
+let dashProva='ativa';
+function setDashProva(provaId,btn){
+  dashProva=provaId;
+  renderDashboard();
+}
+
+// ── FUNÇÃO CENTRAL DE FILTRO ──────────────────────────────
+// Todos os filtros de sessões e revisões passam por aqui.
+// provaId: 'ativa' usa a prova ativa do config; 'all' = todas.
+function _getProvaFiltro(provaId) {
+  if (!provaId || provaId === 'all') return null; // sem filtro
+  if (provaId === 'ativa') {
+    return typeof getProvaAtivaId === 'function' ? getProvaAtivaId() : null;
+  }
+  return provaId;
+}
+
+function filtrarSessoes(provaId, incluiArquivadas=false) {
+  const pid = _getProvaFiltro(provaId);
+  return sessions.filter(s => {
+    if (!incluiArquivadas && s.archived) return false;
+    if (pid) return (s.prova_id || 'ifpe') === pid;
+    return true;
+  });
+}
+
+function filtrarReviews(provaId) {
+  const pid = _getProvaFiltro(provaId);
+  return reviews.filter(r => {
+    if (pid) return (r.prova_id || 'ifpe') === pid;
+    return true;
+  });
+}
+
+function filtrarSimHistorico(provaId) {
+  const pid = _getProvaFiltro(provaId);
+  return (simHistorico || []).filter(s => {
+    if (pid) return (s.prova_id || 'ifpe') === pid;
+    return true;
+  });
+}
+
 function filtrarSessoesPeriodo(){
-  const ativas=sessions.filter(s=>!s.archived);
+  const ativas = filtrarSessoes(progProva);
   if(progPeriodo===0) return ativas;
   const corte=new Date();corte.setDate(corte.getDate()-progPeriodo);
   const cutoff=corte.toISOString().split('T')[0];
@@ -2953,865 +3163,6 @@ async function exportarRelatorio(winPreAberta){
   win.document.close();
 }
 
-// ═══════════════════════════════════════
-//  MÓDULO DE SIMULADOS
-// ═══════════════════════════════════════
-let simConfig={materia:'',topico:'',nivel:'fácil',qtd:5,cronometro:true};
-let simQuestoes=[];
-let simAtual=0;
-let simRespostas=[];
-let simFavoritas=[];
-let simComentarios={};
-let simEliminadas={};
-let simConfirmadas={};
-let simTimerSeg=0;
-let simTimerInterval=null;
-let simPausado=false;
-let simHistorico=JSON.parse(localStorage.getItem('luia_sim_hist')||'[]');
-let simFavSalvas=JSON.parse(localStorage.getItem('luia_sim_favs')||'[]');
-
-const SIM_TOPICOS={
-  'Português':['Interpretação de texto','Tipos e gêneros textuais','Coerência e coesão','Ortografia e acentuação','Classes de palavras','Sintaxe e pontuação','Figuras de linguagem','Variação linguística','Intenção comunicativa','Fato x opinião'],
-  'Matemática':['Frações e decimais','Potenciação e radiciação','Razão e proporção','Regra de três','Porcentagem','Equações do 1º grau','Equações do 2º grau','Geometria plana','Geometria espacial','Estatística e probabilidade'],
-  'Ciências da Natureza':['Ecologia','Vírus e bactérias','Reinos dos seres vivos','Citologia','Fisiologia humana','Genética','Evolução','Química: misturas','Química: reações','Física: mecânica'],
-  'História':['2ª Guerra Mundial','Guerra Fria','Descolonização','Era Vargas','Ditadura Civil-Militar','Nova República','Globalização','Movimentos sociais','Constituição de 1988','América Latina contemporânea'],
-  'Geografia':['Cartografia','Relevo e hidrografia','Clima e vegetação','Geopolítica mundial','Brasil: regiões','Urbanização','Globalização econômica','Problemas ambientais','Fontes de energia','Blocos econômicos'],
-  'Misto (todas)':['Todos os tópicos']
-};
-
-function atualizarTopicosSimulado(){
-  const mat=document.getElementById('sim-materia').value;
-  const sel=document.getElementById('sim-topico');
-  const topicos=SIM_TOPICOS[mat]||[];
-  sel.innerHTML=mat
-    ?'<option value="geral">Todos os tópicos de '+mat+'</option>'+topicos.map(t=>`<option>${t}</option>`).join('')
-    :'<option>Selecione a matéria primeiro</option>';
-}
-
-function selecionarNivel(btn,nivel){
-  if(nivel==='misto'){
-    document.querySelectorAll('.sim-nivel-btn').forEach(b=>b.classList.remove('on'));
-    btn.classList.add('on');
-    simConfig.nivel='misto';
-    return;
-  }
-  // Desativa misto
-  document.querySelectorAll('.sim-nivel-btn').forEach(b=>{
-    if(b.getAttribute('onclick') && b.getAttribute('onclick').includes("'misto'")) b.classList.remove('on');
-  });
-  btn.classList.toggle('on');
-  const ativos=[];
-  document.querySelectorAll('.sim-nivel-btn.on').forEach(b=>{
-    const txt=b.getAttribute('onclick')||'';
-    const m=txt.match(/'(facil|medio|dificil|misto)'/);
-    if(m) ativos.push(m[1]);
-  });
-  if(!ativos.length){btn.classList.add('on');ativos.push(nivel);}
-  simConfig.nivel=ativos.join(',');
-}
-
-function selecionarQtd(btn,qtd){
-  document.querySelectorAll('.sim-qtd-btn').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
-  simConfig.qtd=qtd;
-}
-
-async function iniciarSimulado(){
-  const mat=document.getElementById('sim-materia').value;
-  const top=document.getElementById('sim-topico').value;
-  if(!mat){showToast('Selecione uma matéria!','error');return;}
-
-  simConfig.materia=mat;
-  simConfig.topico=top==='geral'?'todos os tópicos':top;
-  simConfig.cronometro=document.getElementById('sim-cronometro').checked;
-
-  // Mostra tela de loading
-  document.getElementById('sim-tela-config').style.display='none';
-  document.getElementById('sim-tela-prova').style.display='block';
-  document.getElementById('sim-questao-wrap').innerHTML=`
-    <div class="sim-loading">
-      <div class="sim-loading-icon" style="animation:simSatelite 2.5s ease-in-out infinite">
-        <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="26" cy="26" r="10" fill="#7C3AED" opacity=".9"/>
-          <ellipse cx="26" cy="26" rx="22" ry="8" stroke="#A78BFA" stroke-width="2" fill="none" opacity=".5"/>
-          <circle cx="26" cy="18" r="3" fill="#F59E0B"/>
-          <line x1="10" y1="10" x2="16" y2="16" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="42" y1="10" x2="36" y2="16" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <div class="sim-loading-txt">Gerando suas questões...</div>
-      <div class="sim-loading-sub">${simConfig.qtd} questões · ${simConfig.materia} · ${simConfig.nivel}</div>
-    </div>`;
-
-  // Gera questões com Claude
-  try{
-    const nivelMap={
-      facil:'fácil — conceitos básicos, reconhecimento direto, vocabulário acessível. A resposta está explícita ou requer raciocínio simples.',
-      medio:'médio — aplicação de conceitos, interpretação, relação entre ideias. Exige raciocínio lógico e conhecimento do conteúdo.',
-      dificil:'difícil — análise crítica, inferência, raciocínio complexo, integração de múltiplos conceitos. Questões que exigem maturidade intelectual.',
-      misto:'variado — mistura equilibrada entre fácil, médio e difícil, simulando uma prova real.'
-    };
-
-    const instrPorMateria={
-      'Português':`
-INSTRUÇÕES ESPECÍFICAS PARA PORTUGUÊS:
-- OBRIGATÓRIO incluir um texto-base de 150 a 250 palavras antes das questões de interpretação (crônica, notícia, conto, poema, tirinha descrita, texto de divulgação científica).
-- Os textos devem ser originais, autorais e adequados para jovens brasileiros de 14 a 17 anos.
-- Tipos de questões: inferência, intenção do autor, coerência e coesão, vocabulário em contexto, fato x opinião, recursos linguísticos.
-- Evitar questões puramente gramaticais isoladas; prefira sempre contextualizar.`,
-      'Matemática':`
-INSTRUÇÕES ESPECÍFICAS PARA MATEMÁTICA:
-- Sempre contextualizar em situações reais do cotidiano de jovens brasileiros (compras, porcentagem de desconto, medidas, gráficos, dados estatísticos).
-- Incluir enunciados com tabelas ou descrições de gráficos quando pertinente.
-- Evitar cálculos excessivamente longos; focar no raciocínio.`,
-      'Ciências da Natureza':`
-INSTRUÇÕES ESPECÍFICAS PARA CIÊNCIAS:
-- Contextualizar com situações do cotidiano, saúde, meio ambiente, tecnologia.
-- Incluir dados, experimentos descritos ou situações-problema quando possível.
-- Linguagem científica acessível para Ensino Fundamental II e início do Médio.`,
-      'História':`
-INSTRUÇÕES ESPECÍFICAS PARA HISTÓRIA:
-- Incluir fontes históricas (trechos de documentos, descrições de imagens, charges descritas) quando possível.
-- Relacionar o passado com o presente brasileiro.
-- Questões que exigem compreensão de causas, consequências e relações de poder.`,
-      'Geografia':`
-INSTRUÇÕES ESPECÍFICAS PARA GEOGRAFIA:
-- Usar dados reais (IBGE, clima, mapas descritos) quando possível.
-- Contextualizar com problemas contemporâneos: desmatamento, urbanização, geopolítica.
-- Linguagem acessível com terminologia geográfica adequada para a faixa etária.`,
-      'Misto (todas)':`
-INSTRUÇÕES PARA SIMULADO MISTO:
-- Distribuir equilibradamente entre as matérias do edital IFPE.
-- Variar os tipos de questão: interpretação, cálculo, memorização contextualizada, análise.`
-    };
-
-    const instrEspecifica=instrPorMateria[simConfig.materia]||'';
-
-    const prompt=`Você é um especialista em elaboração de questões para processos seletivos de Escolas Técnicas Federais brasileiras, especialmente o IFPE (Instituto Federal de Pernambuco) — Técnico Integrado — e concursos no modelo CONUPE (Coordenação de Unidade Pedagógica de Exames).
-
-SEU PERFIL DE TRABALHO:
-- Público-alvo: estudantes de 14 a 17 anos, cursando o final do Ensino Fundamental II ou início do Ensino Médio.
-- Estilo de prova: CONUPE/IFPE — questões objetivas com 5 alternativas (A a E), uma única correta.
-- As questões devem ser desafiadoras mas justas, sem pegadinhas, com distratores plausíveis que testem o real conhecimento.
-- Linguagem: clara, direta, sem rebuscamentos desnecessários, respeitando o vocabulário da faixa etária.
-- Os distratores (alternativas erradas) devem ser elaborados — não podem ser obviamente errados.
-- Base curricular: BNCC + edital IFPE Técnico Integrado.
-${instrEspecifica}
-
-TAREFA: Crie EXATAMENTE ${simConfig.qtd} questões de múltipla escolha sobre:
-- Matéria: ${simConfig.materia}
-- Tópico: ${simConfig.topico}
-- Nível de dificuldade: ${nivelMap[simConfig.nivel]||simConfig.nivel}
-
-RETORNE APENAS um JSON válido, sem markdown, sem texto antes ou depois, apenas o JSON puro:
-{
-  "questoes": [
-    {
-      "materia": "nome da matéria",
-      "topico": "tópico específico desta questão",
-      "enunciado": "Para Português: inclua o texto-base completo seguido da pergunta. Para outras matérias: enunciado completo com contexto.",
-      "alternativas": {
-        "A": "texto completo da alternativa A",
-        "B": "texto completo da alternativa B",
-        "C": "texto completo da alternativa C",
-        "D": "texto completo da alternativa D",
-        "E": "texto completo da alternativa E"
-      },
-      "gabarito": "letra da alternativa correta (A, B, C, D ou E)",
-      "explicacao": "Explicação didática e detalhada: por que a alternativa correta está certa, e por que cada uma das outras está errada. Tom encorajador, como um professor que quer que o aluno aprenda."
-    }
-  ]
-}`;
-
-    const resp=await fetch(`${SUPA_URL}/functions/v1/gerar-questoes`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
-      body:JSON.stringify({materia:simConfig.materia,topico:simConfig.topico||'',quantidade:simConfig.qtd,dificuldade:simConfig.nivel,prompt})
-    });
-    const txt=await resp.text();
-    const json=JSON.parse(txt.replace(/```json|```/g,'').trim());
-    simQuestoes=json.questoes;
-  }catch(e){
-    showToast('Erro ao gerar questões. Tente novamente.','error');
-    novoSimulado();
-    return;
-  }
-
-  // Inicia simulado
-  simAtual=0;
-  simRespostas=new Array(simQuestoes.length).fill(null);
-  simFavoritas=new Array(simQuestoes.length).fill(false);
-  simComentarios={};
-  simEliminadas={}; // {questaoIdx: [letras eliminadas]}
-  simConfirmadas={};
-  simTimerSeg=0;
-  simPausado=false;
-
-  if(simConfig.cronometro){
-    simTimerInterval=setInterval(()=>{
-      if(!simPausado){simTimerSeg++;atualizarTimer();}
-    },1000);
-  }
-
-  renderQuestao();
-  renderMapa();
-}
-
-function atualizarTimer(){
-  const m=Math.floor(simTimerSeg/60).toString().padStart(2,'0');
-  const s=(simTimerSeg%60).toString().padStart(2,'0');
-  const el=document.getElementById('sim-timer');
-  if(el) el.textContent=m+':'+s;
-}
-
-function formatEnunciado(txt){
-  if(!txt) return '';
-  // Separa texto-base da pergunta pelo separador ---
-  const partes = txt.split(/---+/);
-  if(partes.length>=3){
-    const intro = partes[0].trim();
-    const textoBase = partes[1].trim();
-    const pergunta = partes[2].trim();
-    return `
-      ${intro?`<p style="margin-bottom:10px;font-size:13px;color:var(--text-secondary)">${intro}</p>`:''}
-      <div style="background:rgba(139,92,246,.07);border-left:3px solid #7C3AED;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:14px;font-size:13px;line-height:1.9;color:var(--text-primary)">
-        ${textoBase.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}
-      </div>
-      <p style="font-size:14px;font-weight:600;color:var(--text-primary);line-height:1.7">${pergunta.replace(/\n/g,'<br>')}</p>
-    `;
-  }
-  // Sem separador: renderiza direto com quebras de linha
-  return `<p style="font-size:14px;line-height:1.8">${txt.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</p>`;
-}
-
-function formatExplicacao(txt){
-  if(!txt) return '';
-  // Formata marcadores ✅ ❌ como blocos separados
-  let html = txt
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/(✅[^\n❌✅⚠️💡]*)/g,'<span style="display:block;margin:6px 0;padding:6px 10px;background:rgba(74,222,128,.08);border-radius:6px">$1</span>')
-    .replace(/(❌[^\n❌✅⚠️💡]*)/g,'<span style="display:block;margin:6px 0;padding:6px 10px;background:rgba(239,68,68,.08);border-radius:6px">$1</span>')
-    .replace(/\n\n/g,'</p><p style="margin-top:8px">')
-    .replace(/\n/g,'<br>');
-  return `<div style="font-size:13px;line-height:1.8">💡 <strong>Explicação:</strong><p style="margin-top:8px">${html}</p></div>`;
-}
-
-function renderQuestao(){
-  const q=simQuestoes[simAtual];
-  if(!q) return;
-  const letras=['A','B','C','D','E'];
-  const resp=simRespostas[simAtual];
-  const respondida=!!(simConfirmadas&&simConfirmadas[simAtual]);
-  const fav=simFavoritas[simAtual];
-  const com=simComentarios[simAtual]||'';
-
-  document.getElementById('sim-q-num').textContent=(simAtual+1)+'/'+simQuestoes.length;
-  document.getElementById('sim-btn-fav').innerHTML=fav?'<svg width="13" height="13" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Favoritada':'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Favoritar';
-  document.getElementById('sim-btn-fav').style.color=fav?'var(--warning)':'';
-  document.getElementById('sim-btn-ant').style.opacity=simAtual===0?'0.3':'1';
-  document.getElementById('sim-btn-ant').disabled=simAtual===0;
-
-  const isUltima=simAtual===simQuestoes.length-1;
-  const btnProx=document.getElementById('sim-btn-prox');
-  btnProx.textContent=isUltima?(respondida?'✓ Finalizar':'Finalizar →'):'Próxima →';
-  btnProx.style.background=isUltima&&respondida?'linear-gradient(135deg,#4ADE80,#22C55E)':'';
-
-  const altsHtml=letras.slice(0,5).map((l,li)=>{
-    // Suporta alternativas como objeto {A:,B:,C:} ou como array
-    let alt='';
-    if(q.alternativas){
-      if(typeof q.alternativas==='object'&&!Array.isArray(q.alternativas)){
-        alt=q.alternativas[l]||'';
-      } else if(Array.isArray(q.alternativas)){
-        const item=q.alternativas[li];
-        // Remove prefixo "A) " se já vier na string
-        alt=item?String(item).replace(/^[A-E][)\.]\s*/,''):'';
-      }
-    }
-    if(!alt) return '';
-    let cls='sim-alt';
-    if(respondida){
-      const gab=q.gabarito||q.resposta_correta||"";
-      if(l===gab) cls+=' correta';
-      else if(l===resp) cls+=' errada';
-    } else if(l===resp) cls+=' selecionada';
-    const eliminadas=simEliminadas[simAtual]||[];
-    if(!respondida && eliminadas.includes(l)) cls+=' eliminada';
-    const onclickAttr = respondida?'':`onclick="simAltClick(event,'${l}')"`;
-    return`<div class="${cls}" ${onclickAttr} style="${respondida?'cursor:default':'cursor:pointer'}">
-      <div class="sim-alt-letra">${l}</div>
-      <div class="sim-alt-texto">${alt}</div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('sim-questao-wrap').innerHTML=`
-    <div class="sim-questao-card">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><div class="sim-materia-tag">${q.materia||simConfig.materia} · ${q.topico||simConfig.topico}</div><div style="font-size:10px;padding:2px 8px;border-radius:99px;background:${simConfig.nivel==='fácil'?'rgba(74,222,128,.15)':simConfig.nivel==='médio'?'rgba(251,191,36,.15)':'rgba(248,113,113,.15)'};color:${simConfig.nivel==='fácil'?'#4ADE80':simConfig.nivel==='médio'?'#FBBF24':'#F87171'};font-weight:600;text-transform:uppercase;letter-spacing:.05em">${simConfig.nivel}</div></div>
-      <div class="sim-enunciado">${formatEnunciado(q.enunciado||q.pergunta||"")}</div>
-      <div class="sim-alternativas">${altsHtml}</div>
-      ${respondida&&q.explicacao?`<div class="sim-explicacao" id="sim-exp" style="display:block">${formatExplicacao(q.explicacao)}</div>`:''}
-    </div>
-    ${com?`<div style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--info);margin-top:-4px;margin-bottom:4px">💬 ${com}</div>`:''}`;
-
-  renderMapa();
-  document.getElementById('sim-modal-com').style.display='none';
-  if(com) document.getElementById('sim-comentario-txt').value=com;
-  setTimeout(atualizarBotoesSimulado,0);
-}
-
-let _simClickTimer=null;
-function simAltClick(e,letra){
-  // Detecta duplo clique pelo detalhe do evento
-  if(e.detail===2){
-    // Duplo clique — eliminar/restaurar
-    clearTimeout(_simClickTimer);
-    if(!simEliminadas[simAtual]) simEliminadas[simAtual]=[];
-    const idx=simEliminadas[simAtual].indexOf(letra);
-    if(idx>=0){
-      simEliminadas[simAtual].splice(idx,1);
-    } else {
-      if(simRespostas[simAtual]===letra) simRespostas[simAtual]=null;
-      simEliminadas[simAtual].push(letra);
-    }
-    renderQuestao();
-  } else {
-    // Clique simples — marcar (com pequeno delay para não conflitar com duplo)
-    clearTimeout(_simClickTimer);
-    _simClickTimer=setTimeout(()=>{
-      const eliminadas=simEliminadas[simAtual]||[];
-      if(!eliminadas.includes(letra)) responderQuestao(letra);
-    },180);
-  }
-}
-
-function eliminarAlternativa(letra, el){
-  if(!simEliminadas[simAtual]) simEliminadas[simAtual]=[];
-  const idx=simEliminadas[simAtual].indexOf(letra);
-  if(idx>=0){
-    simEliminadas[simAtual].splice(idx,1); // remove eliminação
-  } else {
-    // Se está selecionada, desseleciona antes de eliminar
-    if(simRespostas[simAtual]===letra) simRespostas[simAtual]=null;
-    simEliminadas[simAtual].push(letra);
-  }
-  renderQuestao();
-}
-
-function responderQuestao(letra){
-  // Só seleciona — não revela resposta ainda
-  if(simRespostas[simAtual]===letra){
-    simRespostas[simAtual]=null; // deseleciona se clicar na mesma
-  } else {
-    simRespostas[simAtual]=letra;
-  }
-  renderQuestao();
-  renderMapa();
-  // Atualiza estado do botão confirmar
-  const btnConf=document.getElementById('sim-btn-confirmar');
-  if(btnConf) btnConf.disabled=!simRespostas[simAtual];
-}
-
-function confirmarResposta(){
-  const resp=simRespostas[simAtual];
-  if(!resp) return;
-  const q=simQuestoes[simAtual];
-  const certa=resp===(q.gabarito||q.resposta_correta);
-  if(certa) showToast('Correto! ✓','success');
-  else showToast('Errado. A resposta é '+(q.gabarito||q.resposta_correta),'error');
-  // Marca como confirmada
-  if(!simConfirmadas) simConfirmadas={};
-  simConfirmadas[simAtual]=true;
-  renderQuestao();
-  renderMapa();
-  // Atualiza botões
-  atualizarBotoesSimulado();
-}
-
-function atualizarBotoesSimulado(){
-  const confirmada=simConfirmadas&&simConfirmadas[simAtual];
-  const resp=simRespostas[simAtual];
-  const btnConf=document.getElementById('sim-btn-confirmar');
-  const btnProx=document.getElementById('sim-btn-prox');
-  if(btnConf){
-    btnConf.style.display=confirmada?'none':'flex';
-    btnConf.disabled=!resp;
-    btnConf.style.opacity=resp?'1':'0.5';
-    btnConf.style.cursor=resp?'pointer':'not-allowed';
-  }
-  if(btnProx) btnProx.style.display=confirmada?'flex':'none';
-}
-
-function proximaQuestao(){
-  const isUltima=simAtual===simQuestoes.length-1;
-  if(isUltima){
-    // Verificar questões não respondidas
-    const naoRespondidas=simQuestoes.reduce((acc,_,i)=>(!simConfirmadas[i]?acc+1:acc),0);
-    if(naoRespondidas>0){
-      if(!confirm(`Você tem ${naoRespondidas} questão(ões) sem resposta. Deseja finalizar mesmo assim?`)) return;
-    }
-    encerrarSimulado();return;
-  }
-  irQuestao(simAtual+1);
-}
-
-function irQuestao(idx){
-  if(idx<0||idx>=simQuestoes.length) return;
-  simAtual=idx;
-  renderQuestao();
-  renderMapa();
-  document.getElementById('sim-modal-com').style.display='none';
-}
-
-function renderMapa(){
-  const el=document.getElementById('sim-mapa');
-  if(!el) return;
-  el.innerHTML=simQuestoes.map((_,i)=>{
-    const resp=simRespostas[i];
-    const fav=simFavoritas[i];
-    let cls='sim-mapa-dot';
-    if(i===simAtual) cls+=' atual';
-    else if(fav&&resp!==null) cls+=' favorita';
-    else if(resp!==null&&resp===simQuestoes[i].gabarito) cls+=' certa';
-    else if(resp!==null) cls+=' errada-dot';
-    else if(resp!==null) cls+=' respondida';
-    return`<div class="${cls}" onclick="irQuestao(${i})">${i+1}</div>`;
-  }).join('');
-}
-
-function toggleFavorita(){
-  simFavoritas[simAtual]=!simFavoritas[simAtual];
-  renderQuestao();
-  renderMapa();
-  showToast(simFavoritas[simAtual]?'⭐ Favoritada!':'Removida dos favoritos','info');
-}
-
-function abrirComentario(){
-  const modal=document.getElementById('sim-modal-com');
-  modal.style.display=modal.style.display==='none'?'block':'none';
-}
-
-function salvarComentario(){
-  const txt=document.getElementById('sim-comentario-txt').value.trim();
-  simComentarios[simAtual]=txt;
-  document.getElementById('sim-modal-com').style.display='none';
-  renderQuestao();
-  showToast('Comentário salvo!','success');
-}
-
-function pausarSimulado(){
-  simPausado=!simPausado;
-  const btn=document.getElementById('sim-pause-btn');
-  btn.textContent=simPausado?'▶ Continuar':'⏸ Pausar';
-  if(simPausado) showToast('Pausado','info');
-}
-
-function encerrarSimulado(){
-  clearInterval(simTimerInterval);
-  const acertos=simRespostas.filter((r,i)=>r&&r===(simQuestoes[i]?.gabarito||simQuestoes[i]?.resposta_correta)).length;
-  const total=simQuestoes.length;
-  const pct=Math.round(acertos/total*100);
-  const cor=pct>=80?'#4ADE80':pct>=60?'#FBBF24':'#F87171';
-
-  // Salva no histórico com questões completas
-  const _agora=new Date();
-  const registro={
-    data:todayLocal(),
-    hora:_agora.getHours().toString().padStart(2,'0')+':'+_agora.getMinutes().toString().padStart(2,'0'),
-    materia:simConfig.materia,
-    topico:simConfig.topico,
-    nivel:simConfig.nivel,
-    total,acertos,pct,
-    tempo:simTimerSeg,
-    questoes:simQuestoes,
-    respostas:[...simRespostas],
-    favoritas:[...simFavoritas],
-    comentarios:{...simComentarios},
-    arquivado:false
-  };
-  simHistorico.unshift(registro);
-  if(simHistorico.length>50) simHistorico=simHistorico.slice(0,50);
-  localStorage.setItem('luia_sim_hist',JSON.stringify(simHistorico));
-
-  // Salva favoritas
-  const favs=simQuestoes.filter((_,i)=>simFavoritas[i]).map((q,i)=>({
-    ...q,comentario:simComentarios[i]||'',data:todayLocal()
-  }));
-  simFavSalvas=[...favs,...simFavSalvas].slice(0,200);
-  localStorage.setItem('luia_sim_favs',JSON.stringify(simFavSalvas));
-
-  // Salva favoritas no Supabase
-  fetch(`${SUPA_URL}/rest/v1/study_goals?id=eq.1`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({sim_favoritas:simFavSalvas})}).catch(()=>{});
-
-  // Salva no Supabase
-  try{
-    sbPost('simulados',{materia:simConfig.materia,topico:simConfig.topico,nivel:simConfig.nivel,total,acertos,tempo_seg:simTimerSeg}).then(res=>{
-      if(res&&res[0]){
-        const simId=res[0].id;
-        // Salva o id do Supabase no registro local para poder arquivar depois
-        if(simHistorico[0]) simHistorico[0].supabase_id=simId;
-        localStorage.setItem('luia_sim_hist',JSON.stringify(simHistorico));
-        simQuestoes.forEach((q,i)=>{
-          sbPost('questoes_respondidas',{
-            simulado_id:simId,enunciado:q.enunciado,
-            alternativas:q.alternativas,resposta_correta:q.gabarito,
-            resposta_dada:simRespostas[i],favorita:simFavoritas[i]||false,
-            comentario:simComentarios[i]||'',tempo_seg:0
-          }).catch(()=>{});
-        });
-      }
-    }).catch(()=>{});
-  }catch(e){}
-
-  // Mostra resultado
-  document.getElementById('sim-tela-prova').style.display='none';
-  document.getElementById('sim-tela-resultado').style.display='block';
-  document.getElementById('sim-res-pct').textContent=pct+'%';
-  document.getElementById('sim-res-pct').style.color=cor;
-  document.getElementById('sim-res-label').textContent=acertos+' de '+total+' questões corretas';
-  const m=Math.floor(simTimerSeg/60),s=simTimerSeg%60;
-  document.getElementById('sim-res-sub').textContent='Tempo: '+m+'min '+s+'s · '+simConfig.materia+' · '+simConfig.nivel;
-
-  // Revisão
-  document.getElementById('sim-revisao-wrap').innerHTML=simQuestoes.map((q,i)=>{
-    const resp=simRespostas[i];
-    const certa=resp===q.gabarito;
-    const fav=simFavoritas[i];
-    return`<div style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,.06)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:11px;font-weight:700;color:${certa?'#4ADE80':'#F87171'}">${certa?'✓ Correto':'✗ Errado'}${fav?' ⭐':''}</span>
-        <span style="font-size:10px;color:var(--text-dim)">${q.topico||simConfig.topico}</span>
-        ${resp?`<span style="font-size:10px;color:var(--text-dim);margin-left:auto">Você: ${resp} · Gabarito: ${q.gabarito}</span>`:'<span style="font-size:10px;color:var(--danger);margin-left:auto">Não respondida</span>'}
-      </div>
-      <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:6px">${q.enunciado.slice(0,150)}${q.enunciado.length>150?'...':''}</div>
-      ${q.explicacao?`<div style="font-size:11px;color:var(--text-dim);font-style:italic;border-left:2px solid rgba(139,92,246,.3);padding-left:8px">${q.explicacao.slice(0,200)}...</div>`:''}
-    </div>`;
-  }).join('');
-
-  // Favoritas no resultado
-  const favqs=simQuestoes.filter((_,i)=>simFavoritas[i]);
-  const favRes=document.getElementById('sim-favoritas-res');
-  if(favqs.length&&favRes){
-    favRes.style.display='block';
-    document.getElementById('sim-favoritas-res-list').innerHTML=favqs.map(q=>
-      `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;color:var(--text-secondary)">${q.enunciado.slice(0,120)}...</div>`
-    ).join('');
-  }
-
-  // Esconde botão repetir erros se 100%
-  const btnRepetir=document.getElementById('sim-btn-repetir');
-  if(btnRepetir) btnRepetir.style.display=pct===100?'none':'flex';
-
-  // Atualiza badge e dashboard
-  atualizarRevBadge();
-  renderSimHistorico();
-}
-
-function voltarParaSimulados(){
-  document.getElementById('sim-tela-resultado').style.display='none';
-  document.getElementById('sim-tela-prova').style.display='none';
-  document.getElementById('sim-tela-config').style.display='block';
-  clearInterval(simTimerInterval);
-  renderSimHistorico();
-  renderSimFavoritas();
-}
-
-function _authRepetirSimulado(){
-  if(_visitanteBlocked('repetir simulado')) return;
-  // Pega as questões erradas do simulado atual
-  const erradas=simQuestoes.filter((q,i)=>simRespostas[i]!==(q.gabarito||q.resposta_correta));
-  if(!erradas.length){showToast('Parabéns! Não há erros para repetir! 🎉','success');return;}
-  // Reconfigura simulado com questões erradas
-  simQuestoes=erradas;
-  simConfig.topico=(simConfig.topico||'')+' (revisão de erros)';
-  simConfig.qtd=erradas.length;
-  simAtual=0;
-  simRespostas=new Array(erradas.length).fill(null);
-  simFavoritas=new Array(erradas.length).fill(false);
-  simComentarios={};
-  simEliminadas={};
-  simConfirmadas={};
-  simTimerSeg=0;
-  simPausado=false;
-  document.getElementById('sim-tela-resultado').style.display='none';
-  document.getElementById('sim-tela-config').style.display='none';
-  document.getElementById('sim-tela-prova').style.display='block';
-  if(simConfig.cronometro){
-    clearInterval(simTimerInterval);
-    simTimerInterval=setInterval(()=>{if(!simPausado){simTimerSeg++;atualizarTimer();}},1000);
-  }
-  renderQuestao();
-  renderMapa();
-  showToast('Repetindo '+erradas.length+' questão(ões) com erro! 💪','info');
-}
-
-function novoSimulado(somenteErros=false){
-  document.getElementById('sim-tela-resultado').style.display='none';
-  document.getElementById('sim-tela-prova').style.display='none';
-  document.getElementById('sim-tela-config').style.display='block';
-  clearInterval(simTimerInterval);
-  renderSimHistorico();
-  renderSimFavoritas();
-}
-
-function renderSimHistorico(mostrarArquivados=false){
-  const el=document.getElementById('sim-historico-list');
-  if(!el) return;
-  const lista=simHistorico.filter(s=>mostrarArquivados?s.arquivado:!s.arquivado);
-  const arquivadosN=simHistorico.filter(s=>s.arquivado).length;
-
-  // Separar finalizados (100%) dos em andamento
-  const finalizados=lista.filter(s=>s.pct===100);
-  const emAndamento=lista.filter(s=>s.pct<100);
-
-  // Tabs ativos/arquivados
-  const tabsHtml=`<div style="display:flex;gap:8px;margin-bottom:12px">
-    <button onclick="renderSimHistorico(false)" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid ${!mostrarArquivados?'#7C3AED':'rgba(255,255,255,.12)'};background:${!mostrarArquivados?'rgba(124,58,237,.2)':'transparent'};color:${!mostrarArquivados?'#A78BFA':'var(--text-dim)'};cursor:pointer">Ativos</button>
-    ${arquivadosN>0?`<button onclick="renderSimHistorico(true)" style="font-size:11px;padding:5px 12px;border-radius:99px;border:1px solid ${mostrarArquivados?'#7C3AED':'rgba(255,255,255,.12)'};background:${mostrarArquivados?'rgba(124,58,237,.2)':'transparent'};color:${mostrarArquivados?'#A78BFA':'var(--text-dim)'};cursor:pointer">Arquivados (${arquivadosN})</button>`:''}
-  </div>`;
-
-  if(!lista.length){
-    el.innerHTML=tabsHtml+'<p style="color:var(--text-dim);font-size:13px">'+( mostrarArquivados?'Nenhum simulado arquivado.':'Nenhum simulado ainda.')+'</p>';
-    return;
-  }
-
-  const renderItem=(s)=>{
-    const cor=s.pct>=80?'#4ADE80':s.pct>=60?'#FBBF24':'#F87171';
-    const m=Math.floor((s.tempo||0)/60);
-    const idx=simHistorico.indexOf(s);
-    const temQuestoes=s.questoes&&s.questoes.length>0;
-    // Hora do simulado
-    const hora=s.hora||'';
-    const dataStr=fmtDate(s.data)+(hora?' · '+hora:'');
-    return`<div style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-      <div style="display:flex;align-items:flex-start;gap:10px">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px">${s.materia}</div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:2px">${s.topico}</div>
-          <div style="font-size:10px;color:var(--text-dim)">${dataStr} · ${s.nivel} · ${m}min</div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-family:'Poppins',sans-serif;font-size:1.2rem;font-weight:700;color:${cor}">${s.pct}%</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px">${s.acertos}/${s.total} certas</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-        ${temQuestoes?`<button onclick="verSimulado(${idx})" style="font-size:11px;padding:5px 12px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);border-radius:8px;color:#A78BFA;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Ver questões</button>`:''}
-        ${s.pct<100&&temQuestoes&&!s.arquivado?`<button onclick="_authRefazerErros(${idx})" style="font-size:11px;padding:5px 12px;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.2);border-radius:8px;color:#A78BFA;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg> Refazer erros</button>`:''}
-        ${!s.arquivado
-          ?`<button onclick="_authArquivarSim(${idx})" style="font-size:11px;padding:5px 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-dim);cursor:pointer;display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> Arquivar</button>`
-          :`<button onclick="_authDesarquivarSim(${idx})" style="font-size:11px;padding:5px 12px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:8px;color:#4ADE80;cursor:pointer;display:inline-flex;align-items:center;gap:5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg> Restaurar</button>`
-        }
-      </div>
-    </div>`;
-  };
-
-  let html=tabsHtml;
-
-  if(!mostrarArquivados){
-    if(emAndamento.length>0){
-      html+=`<div style="margin-bottom:16px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#FBBF24;margin-bottom:8px;display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Em andamento (${emAndamento.length})</div>${emAndamento.map(renderItem).join('')}</div>`;
-    }
-    if(finalizados.length>0){
-      html+=`<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#4ADE80;margin-bottom:8px;display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Finalizados (${finalizados.length})</div>${finalizados.map(renderItem).join('')}</div>`;
-    }
-  } else {
-    html+=lista.map(renderItem).join('');
-  }
-
-  el.innerHTML=html;
-}
-
-function _authNovoSimuladoErros(){if(_visitanteBlocked("repetir erros"))return;novoSimulado(true);}
-function _authRefazerErros(idx){if(_visitanteBlocked('refazer simulado'))return;refazerErros(idx);}
-function _authArquivarSim(idx){if(_visitanteBlocked('arquivar simulado'))return;arquivarSimulado(idx);}
-function _authDesarquivarSim(idx){if(_visitanteBlocked('restaurar simulado'))return;desarquivarSimulado(idx);}
-function refazerErros(idx){
-  if(_visitanteBlocked('refazer simulado')) return;
-  const s=simHistorico[idx];
-  if(!s||!s.questoes) return;
-  // Filtra só as questões que ela errou
-  const erradas=s.questoes.filter((q,i)=>s.respostas&&s.respostas[i]!==q.gabarito);
-  if(!erradas.length){showToast('Parabéns! Não há erros para refazer! 🎉','success');return;}
-  // Configura o simulado com as questões erradas
-  simQuestoes=erradas;
-  simConfig.materia=s.materia;
-  simConfig.topico=s.topico+' (revisão de erros)';
-  simConfig.nivel=s.nivel;
-  simConfig.qtd=erradas.length;
-  simAtual=0;
-  simRespostas=new Array(erradas.length).fill(null);
-  simFavoritas=new Array(erradas.length).fill(false);
-  simComentarios={};
-  simTimerSeg=0;
-  simPausado=false;
-  // Vai para a tela de prova
-  document.getElementById('sim-tela-config').style.display='none';
-  document.getElementById('sim-tela-resultado').style.display='none';
-  document.getElementById('sim-tela-prova').style.display='block';
-  if(simConfig.cronometro){
-    simTimerInterval=setInterval(()=>{if(!simPausado){simTimerSeg++;atualizarTimer();}},1000);
-  }
-  renderQuestao();
-  renderMapa();
-  showToast(`Refazendo ${erradas.length} questão(ões) errada(s) de ${s.materia}! 💪`,'info');
-}
-
-function desarquivarSimulado(idx){
-  simHistorico[idx].arquivado=false;
-  localStorage.setItem('luia_sim_hist',JSON.stringify(simHistorico));
-  if(simHistorico[idx].supabase_id){
-    fetch(`${SUPA_URL}/rest/v1/simulados?id=eq.${simHistorico[idx].supabase_id}`,{
-      method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
-      body:JSON.stringify({arquivado:false})
-    }).catch(()=>{});
-  }
-  renderSimHistorico(true);
-  showToast('Simulado restaurado!','success');
-}
-
-function arquivarSimulado(idx){
-  if(!confirm('Arquivar este simulado? Ele ficará oculto mas não será apagado.')) return;
-  simHistorico[idx].arquivado=true;
-  localStorage.setItem('luia_sim_hist',JSON.stringify(simHistorico));
-  // Arquivar no Supabase se tiver id
-  if(simHistorico[idx].supabase_id){
-    fetch(`${SUPA_URL}/rest/v1/simulados?id=eq.${simHistorico[idx].supabase_id}`,{
-      method:'PATCH',
-      headers:{...H,'Prefer':'return=minimal'},
-      body:JSON.stringify({arquivado:true})
-    }).catch(()=>{});
-  }
-  renderSimHistorico();
-  showToast('Simulado arquivado.','info');
-}
-
-function verSimulado(idx){
-  const s=simHistorico[idx];
-  if(!s||!s.questoes||!s.questoes.length){showToast('Questões não disponíveis para este simulado.','info');return;}
-  const letras=['A','B','C','D','E'];
-  const cor=s.pct>=80?'#4ADE80':s.pct>=60?'#FBBF24':'#F87171';
-  let html=`<div id="ver-sim-overlay" style="position:fixed;inset:0;background:#0F172A;z-index:9999;display:flex;flex-direction:column" onclick="if(event.target.id==='ver-sim-overlay')this.remove()">
-    <div style="background:linear-gradient(135deg,#0F172A,#1E1B4B);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(124,58,237,.3)">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button onclick="document.getElementById('ver-sim-overlay').remove()" style="background:rgba(255,255,255,.08);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;padding:6px 12px;font-weight:600">← Voltar</button>
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#fff">${s.materia} · ${s.topico}</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.5)">${fmtDate(s.data)}${s.hora?' · '+s.hora:''} · ${s.nivel}</div>
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-family:'Poppins',sans-serif;font-size:1.4rem;font-weight:800;color:${cor}">${s.pct}%</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.4)">${s.acertos}/${s.total} certas</div>
-      </div>
-    </div>
-    <div style="flex:1;overflow-y:auto;padding:20px;max-width:760px;width:100%;margin:0 auto">
-      ${s.questoes.map((q,qi)=>{
-        const resp=s.respostas?s.respostas[qi]:null;
-        const certa=resp===q.gabarito;
-        return`<div style="margin-bottom:20px;padding:16px;background:rgba(255,255,255,.03);border-radius:10px;border-left:3px solid ${certa?'#4ADE80':'#F87171'}">
-          <div style="font-size:11px;font-weight:700;color:${certa?'#4ADE80':'#F87171'};margin-bottom:8px">${qi+1}. ${certa?'✓ Correto':'✗ Errado'}${s.favoritas&&s.favoritas[qi]?' ⭐':''}</div>
-          <div style="font-size:13px;color:var(--text-primary);margin-bottom:10px;line-height:1.6">${q.enunciado.replace(/---+/g,'<hr style="border-color:rgba(255,255,255,.1);margin:8px 0">').replace(/\n/g,'<br>')}</div>
-          ${letras.slice(0,5).map(l=>{
-            const alt=q.alternativas&&q.alternativas[l]?l+') '+q.alternativas[l]:(q.alternativas&&Array.isArray(q.alternativas)?q.alternativas[letras.indexOf(l)]||'':'');
-            const isCorreta=l===q.gabarito;
-            const isResp=l===resp;
-            const bg=isCorreta?'rgba(74,222,128,.12)':isResp?'rgba(248,113,113,.12)':'transparent';
-            const border=isCorreta?'rgba(74,222,128,.4)':isResp?'rgba(248,113,113,.4)':'rgba(255,255,255,.06)';
-            return`<div style="padding:8px 12px;margin:4px 0;border-radius:8px;background:${bg};border:1px solid ${border};font-size:12px;color:var(--text-secondary)">${alt}</div>`;
-          }).join('')}
-          ${q.explicacao?`<div style="margin-top:10px;padding:10px;background:rgba(74,222,128,.06);border-radius:8px;font-size:12px;color:var(--text-secondary);line-height:1.6">💡 ${q.explicacao}</div>`:''}
-          ${s.comentarios&&s.comentarios[qi]?`<div style="margin-top:6px;font-size:11px;color:var(--info)">💬 ${s.comentarios[qi]}</div>`:''}
-        </div>`;
-      }).join('')}
-    </div>
-  </div>`;
-  const div=document.createElement('div');
-  div.innerHTML=html;
-  document.body.appendChild(div.firstElementChild);
-}
-
-function renderSimFavoritas(){
-  const el=document.getElementById('sim-favoritas-list');
-  const sec=document.getElementById('sim-favoritas-section');
-  if(!el) return;
-  if(!simFavSalvas.length){if(sec)sec.style.display='none';return;}
-  if(sec) sec.style.display='block';
-  // Agrupa por matéria
-  const porMat={};
-  simFavSalvas.forEach(q=>{
-    const m=q.materia||'Geral';
-    if(!porMat[m]) porMat[m]=[];
-    porMat[m].push(q);
-  });
-  el.innerHTML=Object.entries(porMat).map(([mat,qs])=>`
-    <div style="margin-bottom:14px">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:6px">${mat} (${qs.length})</div>
-      ${qs.map((q,qi)=>{
-        const idxGlobal=simFavSalvas.indexOf(q);
-        return `<div onclick="verQuestaoFavorita(${idxGlobal})" style="padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;border-radius:8px;transition:background .15s" onmouseover="this.style.background='rgba(139,92,246,.08)'" onmouseout="this.style.background='transparent'">
-          <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">${q.enunciado.slice(0,120)}...</div>
-          ${q.comentario?`<div style="font-size:11px;color:var(--info);margin-top:4px;display:flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${q.comentario}</div>`:''}
-          <div style="font-size:10px;color:var(--accent);margin-top:4px">Toque para ver questão completa</div>
-        </div>`;
-      }).join('')}
-    </div>`
-  ).join('');
-}
-
-function verQuestaoFavorita(idx){
-  const q=simFavSalvas[idx];
-  if(!q) return;
-  const letras=['A','B','C','D','E'];
-  const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:#0F172A;z-index:9999;display:flex;flex-direction:column;font-family:Inter,sans-serif';
-  const header=document.createElement('div');
-  header.style.cssText='background:linear-gradient(135deg,#0F172A,#1E1B4B);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(124,58,237,.3)';
-  header.innerHTML=`<div style="display:flex;align-items:center;gap:12px"><button onclick="this.closest('[style*=fixed]').remove()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;font-size:12px;cursor:pointer;padding:7px 14px;font-weight:600">← Voltar</button><div><div style="font-size:14px;font-weight:700;color:#fff">${q.materia||'Questão favorita'}</div><div style="font-size:11px;color:rgba(167,139,250,.8)">${q.topico||''}</div></div></div><svg width="18" height="18" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-  overlay.appendChild(header);
-  const scroll=document.createElement('div');
-  scroll.style.cssText='flex:1;overflow-y:auto;padding:20px;max-width:720px;width:100%;margin:0 auto;box-sizing:border-box';
-  const enuncFmt=(q.enunciado||'').replace(/---+/g,'<div style="border-top:1px solid rgba(255,255,255,.1);margin:12px 0"></div>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  const altsHtml=letras.slice(0,5).map(l=>{
-    let txt='';
-    if(q.alternativas&&typeof q.alternativas==='object'&&!Array.isArray(q.alternativas)) txt=q.alternativas[l]||'';
-    else if(Array.isArray(q.alternativas)) txt=q.alternativas[letras.indexOf(l)]||'';
-    if(!txt) return '';
-    const isCorreta=l===(q.gabarito||q.resposta_correta);
-    const isResp=l===q.resposta_dada;
-    const bg=isCorreta?'rgba(74,222,128,.12)':isResp?'rgba(248,113,113,.1)':'rgba(255,255,255,.02)';
-    const border=isCorreta?'1px solid rgba(74,222,128,.4)':isResp?'1px solid rgba(248,113,113,.4)':'1px solid rgba(255,255,255,.06)';
-    const color=isCorreta?'#4ADE80':isResp?'#F87171':'rgba(255,255,255,.6)';
-    return `<div style="padding:10px 14px;margin:5px 0;border-radius:8px;background:${bg};border:${border};font-size:13px;color:${color};display:flex;gap:10px"><span style="font-weight:700;flex-shrink:0">${l})</span><span>${txt}</span>${isCorreta?'<span style="margin-left:auto">✓</span>':isResp?'<span style="margin-left:auto">✗</span>':''}</div>`;
-  }).join('');
-  scroll.innerHTML=`<div style="padding:16px;background:rgba(255,255,255,.03);border-radius:12px;border-left:3px solid #F59E0B;margin-bottom:20px"><div style="font-size:13px;color:#E2E8F0;line-height:1.7;margin-bottom:12px">${enuncFmt}</div>${altsHtml}${q.explicacao?`<div style="margin-top:12px;padding:12px;background:rgba(74,222,128,.06);border-radius:8px;font-size:12px;color:#94A3B8;line-height:1.7;border-left:2px solid rgba(74,222,128,.3)"><strong style="color:#4ADE80">Explicação:</strong> ${q.explicacao}</div>`:''}${q.comentario?`<div style="margin-top:10px;padding:10px;background:rgba(56,189,248,.06);border-radius:8px;font-size:12px;color:#38BDF8;border-left:2px solid rgba(56,189,248,.3);display:flex;gap:8px;align-items:flex-start"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${q.comentario}</div>`:''}</div>`;
-  overlay.appendChild(scroll);
-  document.body.appendChild(overlay);
-}
-
-// ── INTEGRAÇÃO COM DASHBOARD ──
-function renderSimDash(){
-  // Card de simulados no dash
-  const el=document.getElementById('sim-dash-wrap');
-  if(!el||!simHistorico.length) return;
-  const totalSim=simHistorico.length;
-  const mediaAcertos=Math.round(simHistorico.reduce((a,s)=>a+s.pct,0)/totalSim);
-  const melhor=Math.max(...simHistorico.map(s=>s.pct));
-  el.innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      <div style="text-align:center;padding:10px;background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.15);border-radius:10px">
-        <div style="font-family:'Poppins',sans-serif;font-size:1.3rem;font-weight:700;color:#A78BFA">${totalSim}</div>
-        <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em">Simulados</div>
-      </div>
-      <div style="text-align:center;padding:10px;background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.15);border-radius:10px">
-        <div style="font-family:'Poppins',sans-serif;font-size:1.3rem;font-weight:700;color:#4ADE80">${mediaAcertos}%</div>
-        <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em">Média de acertos</div>
-      </div>
-      <div style="text-align:center;padding:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.15);border-radius:10px;grid-column:span 2">
-        <div style="font-family:'Poppins',sans-serif;font-size:.85rem;font-weight:700;color:#FBBF24">${(()=>{const mp={};simHistorico.filter(s=>!s.arquivado).forEach(s=>{if(!mp[s.materia])mp[s.materia]={t:0,a:0};mp[s.materia].t+=s.total||0;mp[s.materia].a+=s.acertos||0;});const best=Object.entries(mp).filter(e=>e[1].t>0).sort((a,b)=>(b[1].a/b[1].t)-(a[1].a/a[1].t))[0];return best?best[0]:'—';})()}</div>
-        <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em">Melhor matéria</div>
-      </div>
-    </div>`;
-}
 
 // ── WRAPPERS PROTEGIDOS (sem recursão) ──
 function _authOpenEdit(uid){if(_visitanteBlocked('editar sessão'))return;comAuth(()=>openEdit(uid));}
@@ -3830,7 +3181,6 @@ function _authReabrir(id){if(_visitanteBlocked('reabrir revisão'))return;comAut
 function _authArquivar(uid){if(_visitanteBlocked('arquivar sessão'))return;comAuth(()=>arquivar(uid));}
 function _authZerar(mat){if(_visitanteBlocked('zerar matéria'))return;comAuth(()=>zerarMateria(mat));}
 function _authSalvarMetas(){if(_visitanteBlocked('salvar metas'))return;comAuth(()=>salvarMetas());}
-function _authIniciarSimulado(){if(_visitanteBlocked('gerar simulado'))return;comAuth(()=>iniciarSimulado());}
 function _authExportarRelatorio(){
   if(_visitanteBlocked('gerar relatório'))return;
   // Abre janela ANTES do comAuth (popup só funciona no clique direto)
@@ -3886,41 +3236,49 @@ function getFraseHoje(){
 
 // ── CONTADOR REGRESSIVO CIRCULAR ──
 function atualizarContador(){
-  // Pega data da prova das goals ou usa padrão
-  const dataProva = goals.data_prova || '2026-12-20';
-  const nomeObj = goals.objetivo || 'IFPE 2027';
-  const inicio = new Date('2026-06-22T00:00:00'); // início do plano
-  const prova = new Date(dataProva+'T00:00:00');
-  const hoje = new Date();
+  // Pega data e nome da prova ativa (config.js) ou das goals como fallback
+  let dataProva, nomeObj;
+  if (typeof getProvaAtiva === 'function') {
+    const p = getProvaAtiva();
+    dataProva = p.dataProva || p.dataProva1 || goals.data_prova || '2026-12-20';
+    nomeObj   = p.nome || goals.objetivo || 'SSA 1 · UPE';
+  } else {
+    dataProva = goals.data_prova || '2026-12-20';
+    nomeObj   = goals.objetivo   || 'SSA 1 · UPE';
+  }
 
-  const totalDias = Math.ceil((prova-inicio)/(1000*60*60*24));
-  const diasRestantes = Math.max(0, Math.ceil((prova-hoje)/(1000*60*60*24)));
+  const inicio = new Date('2026-06-22T00:00:00'); // início do plano
+  const prova  = new Date(dataProva + 'T00:00:00');
+  const hoje   = new Date();
+
+  const totalDias    = Math.ceil((prova - inicio) / (1000 * 60 * 60 * 24));
+  const diasRestantes= Math.max(0, Math.ceil((prova - hoje) / (1000 * 60 * 60 * 24)));
   const diasPassados = totalDias - diasRestantes;
-  const pct = Math.min(100, Math.round(diasPassados/totalDias*100));
+  const pct          = Math.min(100, Math.round(diasPassados / totalDias * 100));
 
   // Arco SVG: circunferência = 2π*28 ≈ 175.9
-  const circ = 175.9;
+  const circ   = 175.9;
   const offset = circ - (circ * pct / 100);
-  const arc = document.getElementById('countdown-arc');
-  if(arc) arc.style.strokeDashoffset = offset;
+  const arc    = document.getElementById('countdown-arc');
+  if (arc) arc.style.strokeDashoffset = offset;
 
-  const num = document.getElementById('countdown-num');
+  const num   = document.getElementById('countdown-num');
   const texto = document.getElementById('countdown-texto');
   const pctEl = document.getElementById('countdown-pct');
   const objEl = document.getElementById('countdown-objetivo');
 
-  if(num) num.textContent = diasRestantes;
-  if(objEl) objEl.textContent = nomeObj;
-  if(texto) texto.textContent = diasRestantes <= 0
+  if (num)   num.textContent   = diasRestantes;
+  if (objEl) objEl.textContent = nomeObj;
+  if (texto) texto.textContent = diasRestantes <= 0
     ? '🎉 Dia da prova chegou! Vai com tudo!'
     : getFraseHoje();
-  if(pctEl) pctEl.textContent = pct+'% do tempo percorrido · '+diasPassados+' dias estudando';
+  if (pctEl) pctEl.textContent = pct + '% do tempo percorrido · ' + diasPassados + ' dias estudando';
 }
 
 // ── BADGE DE REVISÕES PENDENTES ──
 function atualizarRevBadge(){
   const today = todayLocal();
-  const atrasadas = reviews.filter(r=>r.status==='pendente'&&r.review_date<=today).length;
+  const atrasadas = filtrarReviews('ativa').filter(r=>r.status==='pendente'&&r.review_date<=today).length;
   const badge = document.getElementById('rev-badge');
   if(!badge) return;
   if(atrasadas > 0){
@@ -4032,7 +3390,7 @@ function gerarRelatorio(){
   const todasMat=['Português','Matemática','Ciências da Natureza','História','Geografia'];
   const negligenciadas=todasMat.filter(m=>!porMat[m]);
   const nome=perfilData.nome||'Luísa';
-  const objetivo=goals.objetivo||'IFPE 2027';
+  const objetivo=goals.objetivo||(typeof getProvaAtiva==='function'?getProvaAtiva().nome:'SSA 1 · UPE');
   const prova=new Date(((goals.data_prova||'2027-01-01')+'T00:00:00'));
   const diasProva=Math.ceil((prova-hoje)/(1000*60*60*24));
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório — ${nome}</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#F8F9FF;color:#1E1B4B}.header{background:linear-gradient(135deg,#0F172A,#1E1B4B);padding:24px 32px;display:flex;align-items:center;justify-content:space-between}.logo{font-family:'Poppins',sans-serif;font-size:28px;font-weight:800;color:#fff}.logo span{color:#A78BFA}.h-info{text-align:right}.h-nome{font-size:15px;font-weight:700;color:#fff}.h-sub{font-size:11px;color:rgba(167,139,250,.7);margin-top:2px}.h-data{font-size:10px;color:rgba(255,255,255,.4);margin-top:4px}.periodo{display:inline-block;background:rgba(124,58,237,.3);color:#A78BFA;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;margin-top:4px}.page{max-width:720px;margin:0 auto;padding:28px 24px}section{margin:20px 0}h2{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:#6D28D9;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;display:flex;align-items:center;gap:8px}h2::after{content:'';flex:1;height:1px;background:rgba(109,40,217,.15)}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.sc{background:#fff;border-radius:10px;padding:14px;text-align:center;border:1px solid rgba(109,40,217,.1)}.sv{font-family:'Poppins',sans-serif;font-size:1.4rem;font-weight:800;color:#6D28D9}.sl{font-size:10px;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;margin-top:3px}.pcard{background:#fff;border-radius:10px;padding:18px;border:1px solid rgba(109,40,217,.1)}.pbar{height:10px;background:#F1F5F9;border-radius:99px;overflow:hidden;margin:10px 0}.pbfill{height:100%;border-radius:99px}.mrow{display:flex;align-items:center;gap:10px;margin-bottom:8px}.mnome{width:130px;font-size:12px;font-weight:600;color:#1E1B4B;flex-shrink:0}.mbar{flex:1;height:7px;background:#F1F5F9;border-radius:99px;overflow:hidden}.mbfill{height:100%;border-radius:99px}.mpct{width:34px;text-align:right;font-size:12px;font-weight:600;color:#6D28D9}.mq{width:44px;text-align:right;font-size:10px;color:#94A3B8}table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;padding:5px 8px;border-bottom:2px solid #E2E8F0}td{padding:7px 8px;border-bottom:1px solid #F1F5F9;color:#374151}.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600}.bg{background:#DCFCE7;color:#16A34A}.by{background:#FEF9C3;color:#CA8A04}.br{background:#FEE2E2;color:#DC2626}.alerta{background:#FEF9C3;border-left:3px solid #F59E0B;padding:9px 12px;border-radius:0 8px 8px 0;font-size:12px;color:#92400E;margin-bottom:7px}.ok{background:#DCFCE7;border-left:3px solid #4ADE80;padding:9px 12px;border-radius:0 8px 8px 0;font-size:12px;color:#166534;margin-bottom:7px}.footer{margin-top:28px;padding-top:14px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;font-size:10px;color:#94A3B8}@media print{body{background:#fff}.page{padding:16px}}</style></head><body>
@@ -4047,4 +3405,192 @@ ${simFilt.length>0?`<section><h2>Simulados</h2><table><thead><tr><th>Data</th><t
 </div><script>window.onload=()=>setTimeout(()=>window.print(),500)<\/script></body></html>`;
   win.document.write(html);
   win.document.close();
+}
+// ═══════════════════════════════════════════════════════
+//  SISTEMA DE RANK — Luia App
+//  Separado das conquistas existentes. Não altera nada do
+//  que já existe — apenas adiciona uma camada nova.
+// ═══════════════════════════════════════════════════════
+
+const RANKS = [
+  {
+    id: 'semente',
+    icone: '🌱',
+    nome: 'Semente',
+    desc: 'Toda grande jornada começa com um primeiro passo.',
+    min: 0,
+    max: 99,
+    cor: '#4ADE80',
+    brilho: 'rgba(74,222,128,0.35)'
+  },
+  {
+    id: 'estrela',
+    icone: '⭐',
+    nome: 'Estrela',
+    desc: 'Você está brilhando! 100 questões resolvidas.',
+    min: 100,
+    max: 499,
+    cor: '#FBBF24',
+    brilho: 'rgba(251,191,36,0.35)'
+  },
+  {
+    id: 'supernova',
+    icone: '🌟',
+    nome: 'Supernova',
+    desc: 'Explosão de conhecimento — 500 questões!',
+    min: 500,
+    max: 999,
+    cor: '#F59E0B',
+    brilho: 'rgba(245,158,11,0.40)'
+  },
+  {
+    id: 'astronauta',
+    icone: '🚀',
+    nome: 'Astronauta',
+    desc: 'Você está em órbita. 1.000 questões resolvidas!',
+    min: 1000,
+    max: 4999,
+    cor: '#A78BFA',
+    brilho: 'rgba(167,139,250,0.40)'
+  },
+  {
+    id: 'galaxia',
+    icone: '🌌',
+    nome: 'Galáxia',
+    desc: 'Lendária. 5.000 questões — você é imensurável.',
+    min: 5000,
+    max: Infinity,
+    cor: '#38BDF8',
+    brilho: 'rgba(56,189,248,0.40)'
+  }
+];
+
+// Rank salvo — persiste entre sessões
+let rankAtual = localStorage.getItem('luia_rank') || 'semente';
+
+// ── CALCULA RANK ATUAL ─────────────────────────────────
+function calcRank() {
+  const stats = calcStatsConquistas();
+  const q = stats.totalQ || 0;
+  for (let i = RANKS.length - 1; i >= 0; i--) {
+    if (q >= RANKS[i].min) return RANKS[i];
+  }
+  return RANKS[0];
+}
+
+// ── VERIFICA SE SUBIU DE RANK ──────────────────────────
+// Chamada após verificarConquistas() — não interfere.
+function verificarRank() {
+  const novoRank = calcRank();
+  if (novoRank.id !== rankAtual) {
+    const anterior = RANKS.find(r => r.id === rankAtual);
+    rankAtual = novoRank.id;
+    localStorage.setItem('luia_rank', rankAtual);
+    _mostrarNotifRank(novoRank, anterior);
+  }
+  renderRank();
+}
+
+// ── NOTIFICAÇÃO DE SUBIDA DE RANK ─────────────────────
+function _mostrarNotifRank(novoRank, anterior) {
+  // Dispara fogos da função existente
+  setTimeout(dispararFogos, 300);
+
+  // Cria overlay de celebração
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;pointer-events:none';
+  overlay.innerHTML =
+    '<div style="background:linear-gradient(145deg,#110D25,#1A1435);border:2px solid ' + novoRank.cor + ';border-radius:20px;padding:36px 32px;text-align:center;max-width:320px;pointer-events:all;box-shadow:0 0 48px ' + novoRank.brilho + ';animation:rankPop .4s cubic-bezier(0.34,1.56,0.64,1)">' +
+      '<div style="font-size:4rem;margin-bottom:8px;filter:drop-shadow(0 0 12px ' + novoRank.brilho + ')">' + novoRank.icone + '</div>' +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:' + novoRank.cor + ';margin-bottom:8px">✦ Novo rank desbloqueado!</div>' +
+      '<div style="font-size:26px;font-weight:800;color:#F8F5FF;margin-bottom:6px">' + novoRank.nome + '</div>' +
+      (anterior ? '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-bottom:12px">' + anterior.icone + ' ' + anterior.nome + ' → ' + novoRank.icone + ' ' + novoRank.nome + '</div>' : '') +
+      '<div style="font-size:13px;color:rgba(255,255,255,.6);line-height:1.6;margin-bottom:20px">' + novoRank.desc + '</div>' +
+      '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="background:' + novoRank.cor + ';color:#0A0714;border:none;border-radius:10px;padding:12px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;width:100%">Incrível! ✦</button>' +
+    '</div>' +
+    '<style>@keyframes rankPop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}</style>';
+  document.body.appendChild(overlay);
+}
+
+// ── RENDER DO RANK ─────────────────────────────────────
+// Atualiza todos os elementos visuais de rank na tela.
+function renderRank() {
+  const rank = calcRank();
+  const stats = calcStatsConquistas();
+  const q = stats.totalQ || 0;
+  const proximo = RANKS.find(r => r.min > rank.min);
+  const progPct = proximo
+    ? Math.min(100, Math.round((q - rank.min) / (proximo.min - rank.min) * 100))
+    : 100;
+
+  // ── 1. Badge no hero do dashboard (ao lado do avatar) ──
+  let badgeHero = document.getElementById('rank-badge-hero');
+  if (!badgeHero) {
+    badgeHero = document.createElement('div');
+    badgeHero.id = 'rank-badge-hero';
+    badgeHero.style.cssText = 'position:absolute;bottom:-6px;right:-6px;background:linear-gradient(135deg,#110D25,#1A1435);border:2px solid ' + rank.cor + ';border-radius:99px;padding:3px 8px;font-size:11px;font-weight:700;color:' + rank.cor + ';cursor:pointer;white-space:nowrap;box-shadow:0 0 10px ' + rank.brilho + ';transition:all .2s';
+    badgeHero.setAttribute('title', rank.nome + ' · ' + q + ' questões');
+    badgeHero.onclick = () => showLuia('perfil', null);
+    const avatarWrap = document.querySelector('.hero-avatar-wrap');
+    if (avatarWrap) {
+      avatarWrap.style.position = 'relative';
+      avatarWrap.appendChild(badgeHero);
+    }
+  }
+  badgeHero.style.borderColor = rank.cor;
+  badgeHero.style.color = rank.cor;
+  badgeHero.style.boxShadow = '0 0 10px ' + rank.brilho;
+  badgeHero.innerHTML = rank.icone + ' ' + rank.nome;
+
+  // ── 2. Card de rank no perfil ──
+  let rankCard = document.getElementById('rank-card-perfil');
+  if (!rankCard) {
+    // Injeta antes da seção de conquistas no perfil ou no topo
+    const perfilHero = document.querySelector('.perfil-hero');
+    if (perfilHero) {
+      rankCard = document.createElement('div');
+      rankCard.id = 'rank-card-perfil';
+      perfilHero.parentNode.insertBefore(rankCard, perfilHero.nextSibling);
+    }
+  }
+  if (rankCard) {
+    rankCard.innerHTML =
+      '<div style="background:linear-gradient(135deg,rgba(10,7,20,.9),' + rank.brilho.replace('0.4','0.08') + ');border:1.5px solid ' + rank.cor + '44;border-radius:16px;padding:18px 20px;margin:12px 0;position:relative;overflow:hidden">' +
+        '<div style="position:absolute;top:-30px;right:-20px;font-size:5rem;opacity:.08;filter:blur(2px)">' + rank.icone + '</div>' +
+        '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">' +
+          '<div style="font-size:2.8rem;filter:drop-shadow(0 0 10px ' + rank.brilho + ')">' + rank.icone + '</div>' +
+          '<div>' +
+            '<div style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:' + rank.cor + ';margin-bottom:3px">✦ Rank atual</div>' +
+            '<div style="font-size:22px;font-weight:800;color:#F8F5FF;line-height:1">' + rank.nome + '</div>' +
+            '<div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:3px">' + q + ' questões resolvidas</div>' +
+          '</div>' +
+        '</div>' +
+        // Barra de progresso para o próximo rank
+        (proximo ?
+          '<div>' +
+            '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+              '<span style="font-size:11px;color:rgba(255,255,255,.4)">Progresso para ' + proximo.icone + ' ' + proximo.nome + '</span>' +
+              '<span style="font-size:11px;font-weight:700;color:' + rank.cor + '">' + progPct + '%</span>' +
+            '</div>' +
+            '<div style="background:rgba(255,255,255,.07);border-radius:99px;height:6px;overflow:hidden">' +
+              '<div style="height:100%;width:' + progPct + '%;background:linear-gradient(90deg,' + rank.cor + ',' + (proximo.cor) + ');border-radius:99px;transition:width .6s cubic-bezier(0.16,1,0.3,1)"></div>' +
+            '</div>' +
+            '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:5px">Faltam ' + Math.max(0, proximo.min - q) + ' questões para ' + proximo.nome + '</div>' +
+          '</div>'
+          :
+          '<div style="font-size:12px;color:' + rank.cor + ';font-weight:600;text-align:center;padding:4px 0">🌌 Rank máximo atingido — você é lendária!</div>'
+        ) +
+        // Todos os ranks como timeline
+        '<div style="display:flex;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.06)">' +
+          RANKS.map(r => {
+            const done = q >= r.min;
+            const isCurrent = r.id === rank.id;
+            return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">' +
+              '<div style="font-size:' + (isCurrent ? '1.5rem' : '1rem') + ';filter:' + (done ? 'none' : 'grayscale(1)') + ';opacity:' + (done ? '1' : '.3') + ';transition:all .3s' + (isCurrent ? ';filter:drop-shadow(0 0 6px ' + r.brilho + ')' : '') + '">' + r.icone + '</div>' +
+              '<div style="font-size:8px;font-weight:' + (isCurrent ? '700' : '500') + ';color:' + (isCurrent ? r.cor : 'rgba(255,255,255,.3)') + ';text-align:center">' + r.nome + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+      '</div>';
+  }
 }
