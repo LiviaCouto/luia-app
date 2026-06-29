@@ -6,13 +6,13 @@
 <title>Luia — Luísa Couto Mota</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%230F172A'/><path d='M8 32 C8 32 4 28 4 22 C4 12 12 6 20 6' stroke='%236366F1' stroke-width='3' stroke-linecap='round' fill='none'/><path d='M14 8 L14 26 C14 28.5 16 30.5 18.5 31 L28 31' stroke='%238B5CF6' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/><path d='M28 11 L29.2 14.8 L33 16 L29.2 17.2 L28 21 L26.8 17.2 L23 16 L26.8 14.8 Z' fill='%23F59E0B'/></svg>">
 <link rel="alternate icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%237C3AED'/><text x='50%25' y='55%25' text-anchor='middle' dominant-baseline='middle' font-size='18' fill='white'>✦</text></svg>">
-<meta property="og:title" content="Luísa Couto Mota · IFPE 2027">
-<meta property="og:description" content="Preparatório Técnico Integrado · Ciclo de Estudos personalizado para o IFPE 2027">
+<meta property="og:title" content="Luia · Plataforma de Estudos">
+<meta property="og:description" content="Plataforma de estudos personalizada com IA · Cronograma, revisões e simulados">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://liviacouto.github.io/luisa-ifpe">
-<meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'><rect width='1200' height='630' fill='%2307041A'/><circle cx='200' cy='100' r='300' fill='rgba(124,58,237,0.15)'/><circle cx='1000' cy='530' r='250' fill='rgba(59,7,100,0.15)'/><text x='600' y='260' text-anchor='middle' font-family='serif' font-size='80' fill='%23C084FC'>✦</text><text x='600' y='360' text-anchor='middle' font-family='serif' font-size='52' fill='%23F0E8FF'>Luísa Couto Mota</text><text x='600' y='420' text-anchor='middle' font-family='sans-serif' font-size='24' fill='%239B8EC4'>Preparatório IFPE 2027</text></svg>">
+<meta property="og:image" content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'><rect width='1200' height='630' fill='%2307041A'/><circle cx='200' cy='100' r='300' fill='rgba(124,58,237,0.15)'/><circle cx='1000' cy='530' r='250' fill='rgba(59,7,100,0.15)'/><text x='600' y='260' text-anchor='middle' font-family='serif' font-size='80' fill='%23C084FC'>✦</text><text x='600' y='360' text-anchor='middle' font-family='serif' font-size='52' fill='%23F0E8FF'>Luísa Couto Mota</text><text x='600' y='420' text-anchor='middle' font-family='sans-serif' font-size='24' fill='%239B8EC4'>Plataforma de Estudos</text></svg>">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Luísa Couto Mota · IFPE 2027">
+<meta name="twitter:title" content="Luia · Plataforma de Estudos">
 <meta name="twitter:description" content="Preparatório Técnico Integrado · Ciclo de Estudos personalizado">
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Poppins:wght@400;500;600;700&family=Nunito:wght@700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
@@ -40,7 +40,7 @@
       </svg>
     </div>
     <div class="bv-title" id="bv-title">Bem-vinda ao Luia! ✨</div>
-    <div class="bv-sub" id="bv-sub">Sua plataforma de estudos para o IFPE 2027.<br>Digite sua palavra-chave para entrar.</div>
+    <div class="bv-sub" id="bv-sub">Sua plataforma de estudos.<br>Digite sua palavra-chave para entrar.</div>
     <div style="position:relative">
       <input class="bv-input" id="bv-input" type="password" placeholder="Digite sua palavra-chave..." autocomplete="off" onkeydown="if(event.key==='Enter')bvEntrar()" style="padding-right:44px">
       <button onclick="const i=document.getElementById('bv-input');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:rgba(255,255,255,.5);padding:4px">👁</button>
@@ -133,13 +133,13 @@
     <div style="position:relative">
       <button class="luia-plan-btn" onclick="togglePlanDropdown(this)" id="plan-btn">
         <div class="luia-plan-dot"></div>
-        <span id="plan-label">IFPE 2027</span>
+        <span id="plan-label">Carregando...</span>
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="plano-dropdown" id="plan-dropdown" style="display:none">
         <div class="plano-dropdown-item ativo">
           <div class="plano-dropdown-dot" style="background:#8B5CF6"></div>
-          IFPE 2027
+          <span id="menu-prova-nome">Luia</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2.5" style="margin-left:auto"><path d="M5 13l4 4L19 7"/></svg>
         </div>
         <div class="plano-dropdown-item em-breve">
@@ -181,7 +181,7 @@
             </div>
           </div>
           <div class="countdown-info">
-            <div class="countdown-objetivo" id="countdown-objetivo">IFPE 2027</div>
+            <div class="countdown-objetivo" id="countdown-objetivo">Carregando...</div>
             <div class="countdown-texto" id="countdown-texto">Calculando...</div>
             <div class="countdown-pct" id="countdown-pct"></div>
           </div>
@@ -199,6 +199,9 @@
     <!-- BANNER PALAVRA-CHAVE -->
 
 
+    <!-- Filtro de prova — preenchido por renderDashboard() -->
+    <div id="dash-filtro-prova"></div>
+
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-value" id="st-sess">0</div><div class="stat-label">Registros</div></div>
       <div class="stat-card"><div class="stat-value" id="st-q">0</div><div class="stat-label">Questões</div></div>
@@ -211,6 +214,9 @@
     <div class="streak-card" id="streak-card">
       <div class="streak-top">
         <div class="streak-main">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+            <div style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)">✦ Investida diária</div>
+          </div>
           <div style="display:flex;align-items:flex-end;gap:8px">
             <div class="streak-fire">🔥</div>
             <div class="streak-num" id="streak-num">0</div>
@@ -229,6 +235,7 @@
       </div>
       <div class="streak-calendar" id="streak-calendar"></div>
       <div id="streak-alerta" style="display:none;margin-top:8px;font-size:11px;color:var(--warning);background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:7px 12px;text-align:center"></div>
+      <div style="margin-top:8px;font-size:10px;color:var(--text-dim);text-align:center;opacity:.7">🕛 Contador atualiza à meia-noite · cada dia de estudo conta</div>
     </div>
 
     <!-- METAS NO DASH -->
@@ -570,7 +577,7 @@
     <div class="sobre-mim-card" id="sobre-mim-card" style="display:none">
       <div class="sobre-mim-foto" id="sobre-foto">L</div>
       <div class="sobre-mim-nome" id="sobre-nome">Luísa</div>
-      <div class="sobre-mim-signo" id="sobre-signo">✦ IFPE 2027</div>
+      <div class="sobre-mim-signo" id="sobre-signo">✦</div>
       <div class="sobre-mim-grid" id="sobre-grid">
         <div class="sobre-mim-item sobre-mim-full" style="text-align:center;color:#64748B;font-size:13px">
           Preencha seu perfil para ver seus dados aqui ✨
@@ -581,6 +588,9 @@
 
   <!-- PROGRESSO -->
   <div id="sec-progresso" class="section">
+    <!-- Filtro de prova — preenchido por renderProgresso() -->
+    <div id="prog-filtro-prova"></div>
+
     <!-- Seletor de período + botão exportar -->
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap">
       <div class="filter-tabs" style="margin-bottom:0">
@@ -652,7 +662,7 @@
         <div class="perfil-foto-edit">✏️</div>
       </div>
       <div class="perfil-nome-display" id="perfil-nome-display">Luísa</div>
-      <div class="perfil-apelido" id="perfil-apelido-display">✦ IFPE 2027</div>
+      <div class="perfil-apelido" id="perfil-apelido-display">✦</div>
     </div>
 
     <!-- Seletor de avatares -->
@@ -708,8 +718,8 @@
         <input class="perfil-input" id="perfil-sonho" placeholder="O que você quer ser quando crescer?">
       </div>
       <div class="perfil-field">
-        <label class="perfil-label">Motivação para o IFPE 🚀</label>
-        <input class="perfil-input" id="perfil-motivacao" placeholder="Por que você quer entrar no IFPE?">
+        <label class="perfil-label">Minha motivação 🚀</label>
+        <input class="perfil-input" id="perfil-motivacao" placeholder="O que te motiva a estudar?">
       </div>
     </div>
 
@@ -760,7 +770,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Nome do objetivo</label>
-          <input type="text" class="form-control" id="g-objetivo" placeholder="Ex: IFPE 2027">
+          <input type="text" class="form-control" id="g-objetivo" placeholder="Ex: SSA 1 · UPE, ENEM 2027...">
         </div>
         <div class="form-group">
           <label class="form-label">Data da prova</label>
@@ -944,7 +954,7 @@
 
 <footer>
   <div class="footer-made">Feito com ♥ por Lívia Couto · <em>Product Manager</em> / Eng.ª de Software</div>
-  <div class="footer-rights">© 2026 · Todos os direitos reservados · Luísa Couto Mota · IFPE 2027</div>
+  <div class="footer-rights">© 2026 · Todos os direitos reservados · Luísa Couto Mota</div>
 </footer>
 
 <nav class="bottom-nav" id="bottom-nav">
@@ -1016,6 +1026,9 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="js/edital-ssa1.js"></script>
+<script src="js/config.js"></script>
+<script src="js/nova-prova.js"></script>
 <script src="js/simulados.js"></script>
 <script src="js/app.js"></script>
 
